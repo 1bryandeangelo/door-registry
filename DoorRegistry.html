@@ -1,0 +1,1381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Door Registry</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:#f4f3f0;color:#1a1a1a;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:14px;}
+input,select,textarea,button{font-family:inherit;}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-thumb{background:#ccc;border-radius:3px;}
+input[type=checkbox]{width:14px;height:14px;cursor:pointer;accent-color:#b87514;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useRef,useCallback}=React;
+
+const DOOR_FUNCTIONS=["Passage","Storeroom","Entrance / Vestibule","Office","Exit Only","Stairwell","Mechanical / Utility","Electrified / Access Control","Other"];
+const SWING_OPTIONS=["LH Inswing","LH Outswing","RH Inswing","RH Outswing","LHR Inswing","LHR Outswing","RHR Inswing","RHR Outswing","Pair - Active LH","Pair - Active RH","Sliding","Bi-fold","Other"];
+const QC_OPTIONS=["Pending","Approved","Failed"];
+const EMPTY_DOOR={id:"",location:"",manufacturer:"",model:"",thermal:"Thermal",elevation:"",glassTag:"",glassMakeup:"",glassSize:"",hasMidrail:false,glassSizeMidrail:"",finish:"",hwSet:"",hwSchedule:"",doorFunction:"",swing:"",transom:false,sidelite:false,fireRated:false,workOrder:"",qcSheet:"",qcStatus:"Pending",qcDate:"",elevationImage:null,floorplanImage:null,files:[],timeline:[],hwItems:[],hwCutsheets:[]};
+const NOTE_CATEGORIES=["General","Install","QC","Field Issue","Damage","RFI","Other"];
+
+const C={bg:"#f4f3f0",card:"#ffffff",surface:"#f9f8f6",border:"rgba(0,0,0,0.1)",borderMed:"rgba(0,0,0,0.18)",text:"#1a1a1a",muted:"#666",hint:"#aaa",accent:"#b87514",accentLight:"#fdf3e0",successBg:"#ecfdf5",success:"#166534",dangerBg:"#fef2f2",danger:"#991b1b",warningBg:"#fffbeb",warning:"#92400e",infoBg:"#eff6ff",info:"#1e40af"};
+
+const DEMO_PROJECTS=[
+  {id:"proj-1",jobNumber:"2024-047",name:"Riverside Medical Center",address:"142 River Rd, Manchester NH",createdAt:"2024-02-01",scheduleApproved:true},
+  {id:"proj-2",jobNumber:"2024-061",name:"Harbor Office Tower",address:"88 Harbor Blvd, Portsmouth NH",createdAt:"2024-03-15",scheduleApproved:true},
+];
+const DEMO_DOORS=[
+  {projectId:"proj-1",id:"D-101",location:"Grid A-3, Level 1",manufacturer:"Kawneer",model:"190 Series",thermal:"Thermal",elevation:"A-301/E2",glassType:"1\" IG Solarban 70 Tempered",glassSize:"34\"x82\"",finish:"Dark Bronze Anodized",hwSet:"Set #1A",hwSchedule:"HW-Sched Rev.3 Approved 2/14/24",doorFunction:"Entrance / Vestibule",swing:"LH Outswing",transom:true,sidelite:true,fireRated:false,workOrder:"WO-2024-411",qcSheet:"QC-0411",qcStatus:"Approved",qcDate:"2024-03-02",notes:"Confirm sill flush to finish floor per RFI-012.",elevationImage:null,floorplanImage:null,files:[]},
+  {projectId:"proj-1",id:"D-102",location:"Grid A-3, Level 1",manufacturer:"Kawneer",model:"190 Series",thermal:"Thermal",elevation:"A-301/E3",glassType:"1\" IG Solarban 70 Tempered",glassSize:"34\"x82\"",finish:"Dark Bronze Anodized",hwSet:"Set #1A",hwSchedule:"HW-Sched Rev.3 Approved 2/14/24",doorFunction:"Entrance / Vestibule",swing:"RH Outswing",transom:false,sidelite:false,fireRated:false,workOrder:"WO-2024-412",qcSheet:"QC-0412",qcStatus:"Approved",qcDate:"2024-03-02",notes:"",elevationImage:null,floorplanImage:null,files:[]},
+  {projectId:"proj-1",id:"D-201",location:"Grid C-7, Level 2",manufacturer:"YKK AP",model:"YCW 750 XT",thermal:"Thermal",elevation:"A-401/E1",glassType:"1\" IG Vitro Solarban 60",glassSize:"36\"x84\"",finish:"Clear Anodized",hwSet:"Set #2B",hwSchedule:"HW-Sched Rev.3 Approved 2/14/24",doorFunction:"Office",swing:"RH Inswing",transom:false,sidelite:true,fireRated:false,workOrder:"WO-2024-430",qcSheet:"QC-0430",qcStatus:"Pending",qcDate:"",notes:"Waiting on Allegion hardware - ETA 4/1.",elevationImage:null,floorplanImage:null,files:[]},
+  {projectId:"proj-1",id:"D-301",location:"Grid F-1, Level 3",manufacturer:"Oldcastle",model:"Therml+Block",thermal:"Non-Thermal",elevation:"A-501/E6",glassType:"1/4\" Tempered Lite",glassSize:"12\"x36\"",finish:"Mill Finish",hwSet:"Set #4",hwSchedule:"HW-Sched Rev.3 Approved 2/14/24",doorFunction:"Mechanical / Utility",swing:"RH Inswing",transom:false,sidelite:false,fireRated:true,workOrder:"WO-2024-447",qcSheet:"QC-0447",qcStatus:"Failed",qcDate:"2024-03-15",notes:"QC FAIL - frame corner weld defect at head.",elevationImage:null,floorplanImage:null,files:[]},
+  {projectId:"proj-2",id:"D-101",location:"Grid B-2, Level 1",manufacturer:"Kawneer",model:"350 Series",thermal:"Thermal",elevation:"A-201/E1",glassType:"1\" IG Solarban 60 Tempered",glassSize:"36\"x96\"",finish:"Black Anodized",hwSet:"Set #1",hwSchedule:"HW-Sched Rev.1 Approved 1/20/24",doorFunction:"Entrance / Vestibule",swing:"Pair - Active RH",transom:true,sidelite:true,fireRated:false,workOrder:"WO-2024-501",qcSheet:"QC-0501",qcStatus:"Approved",qcDate:"2024-04-01",notes:"",elevationImage:null,floorplanImage:null,files:[]},
+];
+
+function qcStyle(s){if(s==="Approved")return{bg:C.successBg,color:C.success};if(s==="Failed")return{bg:C.dangerBg,color:C.danger};return{bg:C.warningBg,color:C.warning};}
+function fileToBase64(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(file);});}
+function lsGet(key,fb){try{const v=localStorage.getItem(key);return v?JSON.parse(v):fb;}catch{return fb;}}
+function lsSet(key,val){try{localStorage.setItem(key,JSON.stringify(val));}catch(e){console.warn(e);}}
+async function callClaude(messages,system,apiKey){
+  const resp=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:4000,system,messages})});
+  if(!resp.ok){const e=await resp.json();throw new Error(e.error?.message||"API error");}
+  const data=await resp.json();return data.content?.find(b=>b.type==="text")?.text||"";
+}
+// Robustly extract the first valid JSON object from a string that may contain surrounding text
+function extractJSON(raw){
+  if(!raw)throw new Error("Empty response from API");
+  // Try direct parse first
+  const trimmed=raw.trim();
+  try{return JSON.parse(trimmed);}catch(_){}
+  // Strip markdown code fences
+  const stripped=trimmed.replace(/^```(?:json)?\s*/i,"").replace(/\s*```\s*$/,"").trim();
+  try{return JSON.parse(stripped);}catch(_){}
+  // Find first { ... } block
+  const start=raw.indexOf("{");
+  const end=raw.lastIndexOf("}");
+  if(start!==-1&&end>start){
+    try{return JSON.parse(raw.slice(start,end+1));}catch(_){}
+  }
+  throw new Error("Could not extract valid JSON from response. Raw: "+raw.slice(0,200));
+}
+
+// Shared styles
+const IS={width:"100%",fontSize:13,padding:"7px 10px",border:"1px solid rgba(0,0,0,0.18)",borderRadius:6,background:"#ffffff",color:"#1a1a1a",outline:"none",boxSizing:"border-box"};
+const BS={fontSize:13,fontWeight:500,padding:"6px 14px",border:"1px solid rgba(0,0,0,0.18)",borderRadius:6,cursor:"pointer",background:"transparent",color:"#1a1a1a"};
+const BP={fontSize:13,fontWeight:500,padding:"6px 14px",border:"none",borderRadius:6,cursor:"pointer",background:"#b87514",color:"#fff"};
+const BSm={fontSize:11,fontWeight:500,padding:"4px 9px",border:"1px solid rgba(0,0,0,0.18)",borderRadius:5,cursor:"pointer",background:"transparent",color:"#1a1a1a"};
+const BDng={fontSize:11,fontWeight:500,padding:"4px 9px",border:"1px solid #fca5a5",borderRadius:5,cursor:"pointer",background:"transparent",color:"#991b1b"};
+const CS={background:"#ffffff",border:"1px solid rgba(0,0,0,0.1)",borderRadius:10,padding:"14px 18px"};
+const LS={fontSize:11,fontWeight:500,color:"#666",textTransform:"uppercase",letterSpacing:"0.06em",display:"block",marginBottom:4};
+const tag=(bg,color,extra)=>({fontSize:11,padding:"2px 7px",borderRadius:5,background:bg,color,fontWeight:500,whiteSpace:"nowrap",...(extra||{})});
+const divSty={fontSize:11,fontWeight:500,textTransform:"uppercase",letterSpacing:"0.06em",color:"#aaa",gridColumn:"1/-1",marginTop:8,paddingBottom:5,borderBottom:"1px solid rgba(0,0,0,0.1)"};
+
+// ── APP ───────────────────────────────────────────────────────────────────────
+function App(){
+  const [projects,setProjects]=useState(()=>lsGet("dr_projects",null));
+  const [doors,setDoors]=useState(()=>lsGet("dr_doors",null));
+  const [view,setView]=useState("home");
+  const [activeProject,setActiveProject]=useState(null);
+  const [activeDoorId,setActiveDoorId]=useState(null);
+  const [showAddDoor,setShowAddDoor]=useState(false);
+  const [showWizard,setShowWizard]=useState(false);
+  const [showSettings,setShowSettings]=useState(false);
+  const [gs,setGs]=useState("");const [gFn,setGFn]=useState("");const [gTh,setGTh]=useState("");const [gQc,setGQc]=useState("");
+  const [apiKey,setApiKey]=useState(()=>localStorage.getItem("dr_apikey")||"");
+
+  useEffect(()=>{
+    if(projects===null){setProjects(DEMO_PROJECTS);lsSet("dr_projects",DEMO_PROJECTS);}
+    if(doors===null){setDoors(DEMO_DOORS);lsSet("dr_doors",DEMO_DOORS);}
+  },[]);
+  useEffect(()=>{if(projects!==null)lsSet("dr_projects",projects);},[projects]);
+  useEffect(()=>{if(doors!==null)lsSet("dr_doors",doors);},[doors]);
+  useEffect(()=>{localStorage.setItem("dr_apikey",apiKey);},[apiKey]);
+
+  const upsertProject=useCallback(p=>setProjects(ps=>(ps||[]).find(x=>x.id===p.id)?ps.map(x=>x.id===p.id?p:x):[...(ps||[]),p]),[]);
+  const upsertDoor=useCallback(d=>setDoors(ds=>(ds||[]).find(x=>x.id===d.id&&x.projectId===d.projectId)?ds.map(x=>x.id===d.id&&x.projectId===d.projectId?d:x):[...(ds||[]),d]),[]);
+  const removeDoor=useCallback((pid,did)=>{setDoors(ds=>(ds||[]).filter(x=>!(x.id===did&&x.projectId===pid)));setActiveDoorId(null);},[]);
+  const removeProject=useCallback(id=>{setProjects(ps=>(ps||[]).filter(p=>p.id!==id));setDoors(ds=>(ds||[]).filter(d=>d.projectId!==id));setView("home");setActiveProject(null);setActiveDoorId(null);},[]);
+
+  const goProject=useCallback(p=>{setActiveProject(p);setActiveDoorId(null);setView("project");},[]);
+  const goDoor=useCallback((id,p)=>{if(p)setActiveProject(p);setActiveDoorId(id);setView("project");},[]);
+
+  const sp=projects||[];const sd=doors||[];
+  const pd=activeProject?sd.filter(d=>d.projectId===activeProject.id):[];
+  const activeDoor=activeDoorId?pd.find(d=>d.id===activeDoorId)||null:null;
+  const gf=sd.filter(d=>{
+    const q=gs.toLowerCase();
+    if(q&&!`${d.id} ${d.location} ${d.manufacturer} ${d.model} ${d.hwSet} ${d.doorFunction} ${d.glassType}`.toLowerCase().includes(q))return false;
+    if(gFn&&d.doorFunction!==gFn)return false;if(gTh&&d.thermal!==gTh)return false;if(gQc&&d.qcStatus!==gQc)return false;return true;
+  });
+
+  return(
+    <div style={{minHeight:"100vh",background:C.bg,color:C.text}}>
+      {/* HEADER */}
+      <div style={{background:C.card,borderBottom:"1px solid rgba(0,0,0,0.1)",padding:"0 20px",display:"flex",alignItems:"center",justifyContent:"space-between",height:52,position:"sticky",top:0,zIndex:50,boxShadow:"0 1px 3px rgba(0,0,0,0.06)"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <span style={{fontSize:17,fontWeight:500,cursor:"pointer"}} onClick={()=>{setView("home");setActiveProject(null);setActiveDoorId(null);}}>Door <span style={{color:C.accent}}>Registry</span></span>
+          {view==="project"&&activeProject&&<><span style={{color:C.hint}}>›</span><span style={{fontSize:13,color:C.muted}}>{activeProject.name}</span></>}
+          {view==="global"&&<><span style={{color:C.hint}}>›</span><span style={{fontSize:13,color:C.muted}}>Global Search</span></>}
+        </div>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          <button style={BSm} onClick={()=>setView("global")}>Global Search</button>
+          <button style={BSm} onClick={()=>setShowSettings(true)}>Settings</button>
+          {view==="project"&&<button style={BP} onClick={()=>setShowAddDoor(true)}>+ Add Door</button>}
+          {view==="home"&&<button style={BP} onClick={()=>setShowWizard(true)}>+ New Project</button>}
+        </div>
+      </div>
+
+      {/* HOME */}
+      {view==="home"&&(
+        <div style={{maxWidth:920,margin:"0 auto",padding:"28px 20px"}}>
+          <h1 style={{fontSize:22,fontWeight:500,marginBottom:4}}>Projects</h1>
+          <p style={{color:C.muted,fontSize:13,marginBottom:22}}>{sp.length} project{sp.length!==1?"s":""}</p>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:14}}>
+            {sp.map(p=>{
+              const pds=sd.filter(d=>d.projectId===p.id);const ok=pds.filter(d=>d.qcStatus==="Approved").length;const fail=pds.filter(d=>d.qcStatus==="Failed").length;
+              return(<div key={p.id} style={{...CS,cursor:"pointer",transition:"box-shadow 0.15s"}} onClick={()=>goProject(p)} onMouseEnter={e=>e.currentTarget.style.boxShadow="0 4px 12px rgba(0,0,0,0.1)"} onMouseLeave={e=>e.currentTarget.style.boxShadow="none"}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
+                  <div>{p.jobNumber&&<div style={{fontSize:11,color:C.muted,fontWeight:500}}>#{p.jobNumber}</div>}<div style={{fontSize:15,fontWeight:500,marginTop:2}}>{p.name}</div></div>
+                  {p.scheduleApproved&&<span style={tag(C.successBg,C.success)}>Approved</span>}
+                </div>
+                {p.address&&<div style={{fontSize:12,color:C.muted,marginBottom:10}}>{p.address}</div>}
+                <div style={{display:"flex",gap:14,borderTop:"1px solid rgba(0,0,0,0.1)",paddingTop:9,marginTop:9}}>
+                  <span style={{fontSize:12,color:C.muted}}><b style={{color:C.text,fontWeight:500}}>{pds.length}</b> doors</span>
+                  <span style={{fontSize:12,color:C.success}}><b style={{fontWeight:500}}>{ok}</b> QC ok</span>
+                  {fail>0&&<span style={{fontSize:12,color:C.danger}}><b style={{fontWeight:500}}>{fail}</b> failed</span>}
+                </div>
+              </div>);
+            })}
+            {sp.length===0&&<div style={{...CS,color:C.muted,fontSize:13,textAlign:"center",padding:32,gridColumn:"1/-1"}}>No projects yet. Click "+ New Project" to begin.</div>}
+          </div>
+        </div>
+      )}
+
+      {/* PROJECT — always shows split layout with door list on left */}
+      {view==="project"&&activeProject&&(
+        <ProjectView
+          project={activeProject} doors={pd} activeDoor={activeDoor} activeDoorId={activeDoorId}
+          onSelectDoor={setActiveDoorId}
+          onDeleteProject={()=>removeProject(activeProject.id)}
+          showAdd={showAddDoor} setShowAdd={setShowAddDoor}
+          onSaveDoor={d=>{upsertDoor(d);setActiveDoorId(d.id);}}
+          onDeleteDoor={(pid,did)=>removeDoor(pid,did)}
+          apiKey={apiKey}
+        />
+      )}
+
+      {/* GLOBAL */}
+      {view==="global"&&(
+        <div style={{maxWidth:920,margin:"0 auto",padding:"28px 20px"}}>
+          <h2 style={{fontSize:20,fontWeight:500,marginBottom:16}}>Global Search</h2>
+          <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
+            <input style={{...IS,maxWidth:260}} placeholder="Search all doors..." value={gs} onChange={e=>setGs(e.target.value)} />
+            <select style={{...IS,width:"auto"}} value={gFn} onChange={e=>setGFn(e.target.value)}><option value="">All Functions</option>{DOOR_FUNCTIONS.map(f=><option key={f}>{f}</option>)}</select>
+            <select style={{...IS,width:"auto"}} value={gTh} onChange={e=>setGTh(e.target.value)}><option value="">All Thermal</option><option>Thermal</option><option>Non-Thermal</option></select>
+            <select style={{...IS,width:"auto"}} value={gQc} onChange={e=>setGQc(e.target.value)}><option value="">All QC</option><option>Approved</option><option>Pending</option><option>Failed</option></select>
+          </div>
+          <div style={{fontSize:12,color:C.muted,marginBottom:10}}>{gf.length} result{gf.length!==1?"s":""}</div>
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {gf.map(d=>{
+              const proj=sp.find(p=>p.id===d.projectId);const qc=qcStyle(d.qcStatus);
+              return(<div key={`${d.projectId}-${d.id}`} style={{...CS,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,padding:"10px 16px",transition:"box-shadow 0.15s"}}
+                onClick={()=>{const p=sp.find(x=>x.id===d.projectId);goDoor(d.id,p);}}
+                onMouseEnter={e=>e.currentTarget.style.boxShadow="0 2px 8px rgba(0,0,0,0.08)"}
+                onMouseLeave={e=>e.currentTarget.style.boxShadow="none"}>
+                <div style={{minWidth:0}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontSize:15,fontWeight:500}}>{d.id}</span>{proj&&<span style={{fontSize:11,color:C.muted}}>#{proj.jobNumber} - {proj.name}</span>}</div>
+                  <div style={{fontSize:12,color:C.muted,marginTop:2}}>{[d.doorFunction,d.swing,d.manufacturer,d.model].filter(Boolean).join(" · ")}</div>
+                </div>
+                <div style={{display:"flex",gap:6,flexShrink:0,flexWrap:"wrap",justifyContent:"flex-end"}}>{d.hwSet&&<span style={tag("#f5f4f0",C.muted)}>{d.hwSet}</span>}<span style={tag(qc.bg,qc.color)}>{d.qcStatus}</span></div>
+              </div>);
+            })}
+            {gf.length===0&&<div style={{...CS,color:C.muted,textAlign:"center",padding:32,fontSize:13}}>No doors match your filters.</div>}
+          </div>
+        </div>
+      )}
+
+      {showWizard&&<ProjectWizard apiKey={apiKey} onClose={()=>setShowWizard(false)} onSave={(p,nd)=>{upsertProject(p);nd.forEach(upsertDoor);setShowWizard(false);goProject(p);}} />}
+      {showSettings&&<SettingsModal apiKey={apiKey} setApiKey={setApiKey} onClose={()=>setShowSettings(false)} projects={sp} doors={sd} setProjects={setProjects} setDoors={setDoors} />}
+    </div>
+  );
+}
+
+// ── PROJECT VIEW — persistent split layout ────────────────────────────────────
+function ProjectView({project,doors,activeDoor,activeDoorId,onSelectDoor,onDeleteProject,showAdd,setShowAdd,onSaveDoor,onDeleteDoor,apiKey}){
+  const [search,setSearch]=useState("");
+  const [viewingFile,setViewingFile]=useState(null);
+  const [parseStatus,setParseStatus]=useState(""); // "", "parsing", "done", "error"
+  const [parseMsg,setParseMsg]=useState("");
+  const [scheduleFile,setScheduleFile]=useState(null);
+  const schedRef=useRef();
+  const filtered=doors.filter(d=>!search||`${d.id} ${d.location} ${d.hwSet} ${d.doorFunction}`.toLowerCase().includes(search.toLowerCase()));
+  const handleSaveDoor=useCallback(d=>{onSaveDoor(d);},[onSaveDoor]);
+
+  const parseHardwareSchedule=async()=>{
+    if(!scheduleFile){alert("Upload the hardware schedule PDF first.");return;}
+    if(!apiKey){alert("Add your Anthropic API key in Settings first.");return;}
+    if(!project.scheduleApproved){alert("Mark the hardware schedule as approved before parsing cutsheets.");return;}
+    setParseStatus("parsing");setParseMsg("Reading schedule index and hardware sets...");
+    try{
+      const b64=await fileToBase64(scheduleFile);
+      const isImg=scheduleFile.type.startsWith("image/");
+      const mediaType=isImg?scheduleFile.type:"application/pdf";
+      const docType=isImg?"image":"document";
+
+      // PASS 1: Extract door→set mapping and line items per set
+      setParseMsg("Pass 1 of 2 — Reading door schedule and hardware sets...");
+      const pass1Prompt=`This is a door hardware schedule submittal package. 
+Read ALL pages carefully.
+
+TASK: Extract two things:
+1. The door index: which hardware set applies to each door ID
+2. The full line items for each hardware set (qty, description, part number, finish, item code, manufacturer code)
+
+Return ONLY valid JSON, no markdown:
+{
+  "doorSets": {"109A":"SF-1","110A":"SF-1","110B":"SF-2"},
+  "sets": {
+    "SF-1": [
+      {"qty":"16","description":"Hinge, Full Mortise RC","partNumber":"TA2314 NRP 4-1/2x4","finish":"US32D","itemCode":"HI-1","mfr":"MK"},
+      {"qty":"4","description":"Electric Power Transfer","partNumber":"EPT2 .689","finish":"689","itemCode":"PT-1","mfr":"VO"}
+    ]
+  }
+}
+Extract every door and every set completely. Part numbers must be exact as written.`;
+
+      const pass1Raw=await callClaude([{role:"user",content:[{type:docType,source:{type:"base64",media_type:mediaType,data:b64.split(",")[1]}},{type:"text",text:pass1Prompt}]}],
+        "You are a construction document parser. You MUST return ONLY a raw JSON object with no explanation, no markdown, no code fences, no preamble, no commentary. Start your response with { and end with }. Nothing else.",apiKey);
+      const pass1=extractJSON(pass1Raw);
+
+      setParseMsg("Pass 2 of 2 — Matching cutsheets to hardware items by part number...");
+
+      // PASS 2: For each unique set that has doors, match cutsheet pages to part numbers
+      const usedSets=new Set(Object.values(pass1.doorSets||{}));
+      const setData=pass1.sets||{};
+
+      // Collect all unique part numbers across all used sets
+      const allPartNumbers=[];
+      usedSets.forEach(setId=>{
+        const items=setData[setId]||[];
+        items.forEach(item=>{if(item.partNumber)allPartNumbers.push(item.partNumber);});
+      });
+      const uniqueParts=[...new Set(allPartNumbers)];
+
+      const pass2Prompt=`This is the same hardware schedule submittal package.
+The back half contains product cutsheets — one or more pages per product.
+
+I need to match cutsheet pages to these part numbers:
+${uniqueParts.map((p,i)=>`${i+1}. ${p}`).join("\n")}
+
+For each part number, identify which page numbers in this document contain its cutsheet.
+A cutsheet page may cover multiple products. Look for highlighted or clouded sections that indicate the specific product being submitted.
+
+Return ONLY valid JSON:
+{
+  "matches": {
+    "TA2314 NRP 4-1/2x4": {"pages":[6,7],"note":"McKinney TA2314 hinge, highlighted row: 4.5x4 stainless"},
+    "EPT2 .689": {"pages":[8,9],"note":"Von Duprin EPT-2 electrical power transfer"}
+  }
+}
+Page numbers are 1-indexed. Include all pages that are part of that product's cutsheet section.`;
+
+      const pass2Raw=await callClaude([{role:"user",content:[{type:docType,source:{type:"base64",media_type:mediaType,data:b64.split(",")[1]}},{type:"text",text:pass2Prompt}]}],
+        "You are a construction document parser. You MUST return ONLY a raw JSON object with no explanation, no markdown, no code fences, no preamble, no commentary. Start your response with { and end with }. Nothing else.",apiKey);
+      const pass2=extractJSON(pass2Raw);
+      const matches=pass2.matches||{};
+
+      // Now update each door with its hardware items and note which cutsheet pages apply
+      const doorSetMap=pass1.doorSets||{};
+      let updatedCount=0;
+      doors.forEach(door=>{
+        const setId=doorSetMap[door.id];
+        if(!setId)return;
+        const items=setData[setId]||[];
+        // For each item, find matching cutsheet pages
+        const itemsWithCutsheets=items.map(item=>{
+          const match=matches[item.partNumber]||matches[Object.keys(matches).find(k=>k.includes(item.partNumber.split(" ")[0])||item.partNumber.includes(k.split(" ")[0]))||""]||null;
+          return{...item,cutsheetPages:match?match.pages:[],cutsheetNote:match?match.note:""};
+        });
+        onSaveDoor({...door,hwSet:setId,hwItems:itemsWithCutsheets,hwCutsheetSource:b64,hwCutsheetMediaType:mediaType,hwCutsheetDocType:docType});
+        updatedCount++;
+      });
+
+      setParseStatus("done");
+      setParseMsg(`Done — updated ${updatedCount} door${updatedCount!==1?"s":""} with hardware data.`);
+    }catch(e){
+      setParseStatus("error");
+      setParseMsg("Parse failed: "+e.message);
+      console.error(e);
+    }
+  };
+
+  return(
+    <div style={{display:"flex",height:"calc(100vh - 52px)",overflow:"hidden"}}>
+      {/* LEFT SIDEBAR */}
+      <div style={{width:260,borderRight:"1px solid rgba(0,0,0,0.1)",display:"flex",flexDirection:"column",background:C.card,flexShrink:0}}>
+        {/* Project header */}
+        <div style={{padding:"10px 12px",borderBottom:"1px solid rgba(0,0,0,0.1)",background:C.surface}}>
+          <div style={{fontSize:11,color:C.muted,fontWeight:500,marginBottom:1}}>{project.jobNumber?"#"+project.jobNumber:""}</div>
+          <div style={{fontSize:13,fontWeight:500,marginBottom:6}}>{project.name}</div>
+          <input style={{...IS,fontSize:12}} placeholder="Search doors..." value={search} onChange={e=>setSearch(e.target.value)} />
+        </div>
+        {/* Door list */}
+        <div style={{flex:1,overflowY:"auto"}}>
+          {filtered.length===0&&<div style={{padding:20,color:C.muted,fontSize:12,textAlign:"center"}}>No doors found</div>}
+          {filtered.map(d=>(
+            <DoorListItem key={d.id} door={d} active={d.id===activeDoorId} onClick={()=>{onSelectDoor(d.id);setViewingFile(null);}} />
+          ))}
+        </div>
+        {/* Files for selected door */}
+        {activeDoor&&(
+          <FilesSidebar door={activeDoor} onSaveDoor={handleSaveDoor} onViewFile={setViewingFile} viewingFile={viewingFile} />
+        )}
+      </div>
+
+      {/* MAIN PANEL */}
+      <div style={{flex:1,overflowY:"auto",background:C.bg}}>
+        {viewingFile?(
+          <FileViewer file={viewingFile} onClose={()=>setViewingFile(null)} />
+        ):activeDoor?(
+          <DoorDetail
+            key={activeDoor.id}
+            door={activeDoor}
+            onSave={handleSaveDoor}
+            onDelete={()=>{onDeleteDoor(activeDoor.projectId,activeDoor.id);}}
+          />
+        ):(
+          <div style={{padding:"32px 28px"}}>
+            {/* Project overview */}
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:24}}>
+              <div>
+                {project.jobNumber&&<div style={{fontSize:11,color:C.muted,fontWeight:500,textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:2}}>Job #{project.jobNumber}</div>}
+                <h2 style={{fontSize:20,fontWeight:500,margin:0}}>{project.name}</h2>
+                {project.address&&<div style={{fontSize:13,color:C.muted,marginTop:2}}>{project.address}</div>}
+              </div>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap",justifyContent:"flex-end",alignItems:"center"}}>
+                <span style={tag(C.successBg,C.success,{fontSize:12})}>{doors.filter(d=>d.qcStatus==="Approved").length} QC Approved</span>
+                {doors.filter(d=>d.qcStatus==="Failed").length>0&&<span style={tag(C.dangerBg,C.danger,{fontSize:12})}>{doors.filter(d=>d.qcStatus==="Failed").length} Failed</span>}
+                <span style={tag(C.warningBg,C.warning,{fontSize:12})}>{doors.filter(d=>d.qcStatus==="Pending").length} Pending</span>
+                <button style={BDng} onClick={onDeleteProject}>Delete Project</button>
+              </div>
+            </div>
+
+            {/* Hardware Schedule Parse Panel */}
+            <div style={{...CS,marginBottom:20}}>
+              <div style={{fontSize:11,fontWeight:500,textTransform:"uppercase",letterSpacing:"0.08em",color:C.muted,marginBottom:12,paddingBottom:6,borderBottom:"1px solid rgba(0,0,0,0.1)"}}>Hardware Schedule Parse</div>
+              <p style={{fontSize:13,color:C.muted,marginBottom:14,lineHeight:1.6}}>Upload the full hardware schedule submittal PDF. The AI will read the door index and set pages, then match each door to its hardware items. If the schedule is marked approved, it will also scan the cutsheet pages and link product data to each door.</p>
+              <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap",marginBottom:12}}>
+                <div style={{border:"1px dashed rgba(0,0,0,0.18)",borderRadius:6,padding:"8px 14px",cursor:"pointer",fontSize:13,color:scheduleFile?C.text:C.muted,background:C.surface,flex:1,minWidth:180}} onClick={()=>schedRef.current.click()}>
+                  {scheduleFile?scheduleFile.name:"Click to upload hardware schedule PDF"}
+                </div>
+                <input ref={schedRef} type="file" accept=".pdf,image/*" style={{display:"none"}} onChange={e=>e.target.files[0]&&setScheduleFile(e.target.files[0])} />
+                <button style={{...BP,whiteSpace:"nowrap"}} onClick={parseHardwareSchedule} disabled={parseStatus==="parsing"||!scheduleFile}>
+                  {parseStatus==="parsing"?"Parsing...":"Parse Schedule"}
+                </button>
+              </div>
+              {!project.scheduleApproved&&<div style={{fontSize:12,color:C.warning,padding:"6px 10px",background:C.warningBg,borderRadius:5,marginBottom:8}}>Schedule not marked approved — cutsheet matching will be skipped. Mark approved in project settings to enable full parse.</div>}
+              {!apiKey&&<div style={{fontSize:12,color:C.warning,padding:"6px 10px",background:C.warningBg,borderRadius:5,marginBottom:8}}>No API key set — go to Settings before parsing.</div>}
+              {parseMsg&&(
+                <div style={{fontSize:12,padding:"8px 12px",borderRadius:5,background:parseStatus==="error"?C.dangerBg:parseStatus==="done"?C.successBg:"#eff6ff",color:parseStatus==="error"?C.danger:parseStatus==="done"?C.success:C.info}}>
+                  {parseStatus==="parsing"&&<span style={{marginRight:6}}>⏳</span>}{parseStatus==="done"&&<span style={{marginRight:6}}>✓</span>}{parseMsg}
+                </div>
+              )}
+            </div>
+
+            <div style={{color:C.muted,fontSize:13,textAlign:"center",padding:20}}>{doors.length===0?"No doors yet — click + Add Door to begin.":"← Select a door from the list to view its record."}</div>
+          </div>
+        )}
+      </div>
+
+      {showAdd&&<DoorModal projectId={project.id} onClose={()=>setShowAdd(false)} onSave={d=>{handleSaveDoor(d);setShowAdd(false);}} existingIds={doors.map(d=>d.id)} />}
+    </div>
+  );
+}
+
+// ── DOOR LIST ITEM ────────────────────────────────────────────────────────────
+function DoorListItem({door,active,onClick}){
+  const qc=qcStyle(door.qcStatus);
+  const summary=[door.doorFunction,door.swing].filter(Boolean).join(" · ");
+  return(
+    <div onClick={onClick} style={{padding:"10px 12px",borderBottom:"1px solid rgba(0,0,0,0.07)",cursor:"pointer",background:active?"#fff8ee":"transparent",borderLeft:active?"3px solid #b87514":"3px solid transparent",transition:"background 0.1s"}}
+      onMouseEnter={e=>{if(!active)e.currentTarget.style.background=C.surface;}}
+      onMouseLeave={e=>{if(!active)e.currentTarget.style.background="transparent";}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <span style={{fontSize:15,fontWeight:500}}>{door.id}</span>
+        <span style={tag(qc.bg,qc.color,{fontSize:10})}>{door.qcStatus}</span>
+      </div>
+      {summary&&<div style={{fontSize:11,color:C.muted,marginTop:3,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{summary}</div>}
+      <div style={{display:"flex",gap:4,marginTop:5,flexWrap:"wrap"}}>
+        {door.swing&&<span style={tag(C.infoBg,C.info,{fontSize:10})}>{door.swing}</span>}
+        {door.hwSet&&<span style={tag("#f5f4f0",C.muted,{fontSize:10})}>{door.hwSet}</span>}
+        {door.transom&&<span style={tag(C.accentLight,C.accent,{fontSize:10})}>Transom</span>}
+        {door.sidelite&&<span style={tag(C.accentLight,C.accent,{fontSize:10})}>Sidelite</span>}
+        {door.fireRated&&<span style={tag(C.dangerBg,C.danger,{fontSize:10})}>Fire Rated</span>}
+      </div>
+    </div>
+  );
+}
+
+// ── FILES SIDEBAR ─────────────────────────────────────────────────────────────
+function FilesSidebar({door,onSaveDoor,onViewFile,viewingFile}){
+  const fileRef=useRef();
+  const [renamingIdx,setRenamingIdx]=useState(null);
+  const [renameVal,setRenameVal]=useState("");
+  const [drag,setDrag]=useState(false);
+
+  const files=door.files||[];
+
+  const addFileObjects=async(fileList)=>{
+    const newFiles=[];
+    for(const file of fileList){
+      const b64=await fileToBase64(file);
+      newFiles.push({id:`f-${Date.now()}-${Math.random().toString(36).slice(2,6)}`,name:file.name,type:file.type,data:b64});
+    }
+    onSaveDoor({...door,files:[...files,...newFiles]});
+  };
+
+  const addFiles=async(e)=>{await addFileObjects(e.target.files);e.target.value="";};
+  const dropFiles=async(e)=>{e.preventDefault();setDrag(false);if(e.dataTransfer.files.length)await addFileObjects(e.dataTransfer.files);};
+
+  const removeFile=idx=>{
+    const updated=files.filter((_,i)=>i!==idx);
+    onSaveDoor({...door,files:updated});
+  };
+
+  const startRename=idx=>{setRenamingIdx(idx);setRenameVal(files[idx].name);};
+  const commitRename=idx=>{
+    if(!renameVal.trim()){setRenamingIdx(null);return;}
+    const updated=files.map((f,i)=>i===idx?{...f,name:renameVal.trim()}:f);
+    onSaveDoor({...door,files:updated});
+    setRenamingIdx(null);
+  };
+
+  return(
+    <div style={{borderTop:"1px solid rgba(0,0,0,0.1)",background:C.surface,maxHeight:280,display:"flex",flexDirection:"column"}}
+      onDragOver={e=>{e.preventDefault();setDrag(true);}}
+      onDragLeave={e=>{if(!e.currentTarget.contains(e.relatedTarget))setDrag(false);}}
+      onDrop={dropFiles}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 12px",borderBottom:`1px solid ${drag?"#b87514":"rgba(0,0,0,0.07)"}`,background:drag?C.accentLight:"transparent",transition:"all 0.15s"}}>
+        <span style={{fontSize:11,fontWeight:500,textTransform:"uppercase",letterSpacing:"0.06em",color:drag?C.accent:C.muted}}>{drag?"Drop files here":"Files"}</span>
+        <button style={{...BSm,fontSize:10,padding:"2px 7px"}} onClick={()=>fileRef.current.click()}>+ Add</button>
+        <input ref={fileRef} type="file" accept=".pdf,image/*" multiple style={{display:"none"}} onChange={addFiles} />
+      </div>
+      <div style={{overflowY:"auto",flex:1}}>
+        {files.length===0&&<div style={{padding:"10px 12px",fontSize:11,color:C.hint}}>No files attached. Click + Add or drag & drop files here.</div>}
+        {files.map((f,i)=>{
+          const isViewing=viewingFile&&viewingFile.id===f.id;
+          return(
+            <div key={f.id||i} style={{padding:"6px 12px",borderBottom:"1px solid rgba(0,0,0,0.05)",background:isViewing?"#fff8ee":"transparent"}}>
+              {renamingIdx===i?(
+                <div style={{display:"flex",gap:4}}>
+                  <input style={{...IS,fontSize:11,padding:"3px 6px",flex:1}} value={renameVal} onChange={e=>setRenameVal(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")commitRename(i);if(e.key==="Escape")setRenamingIdx(null);}} autoFocus />
+                  <button style={{...BSm,fontSize:10,padding:"2px 6px"}} onClick={()=>commitRename(i)}>OK</button>
+                </div>
+              ):(
+                <div style={{display:"flex",alignItems:"center",gap:4}}>
+                  <span style={{fontSize:11,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",cursor:"pointer",color:isViewing?C.accent:C.text}} onClick={()=>onViewFile(f)} title={f.name}>{f.name}</span>
+                  <button style={{...BSm,fontSize:9,padding:"1px 5px",flexShrink:0}} onClick={()=>startRename(i)}>✎</button>
+                  <button style={{...BDng,fontSize:9,padding:"1px 5px",flexShrink:0}} onClick={()=>removeFile(i)}>✕</button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── FILE VIEWER ───────────────────────────────────────────────────────────────
+function FileViewer({file,onClose}){
+  const isPdf=file.type==="application/pdf"||file.name.toLowerCase().endsWith(".pdf");
+  const isImg=file.type.startsWith("image/")||/\.(png|jpg|jpeg|gif|webp)$/i.test(file.name);
+  return(
+    <div style={{display:"flex",flexDirection:"column",height:"100%"}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 20px",borderBottom:"1px solid rgba(0,0,0,0.1)",background:C.card,flexShrink:0}}>
+        <span style={{fontSize:13,fontWeight:500}}>{file.name}</span>
+        <button style={BSm} onClick={onClose}>✕ Close</button>
+      </div>
+      <div style={{flex:1,overflow:"auto",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:20,background:"#e8e6e0"}}>
+        {isPdf?(
+          <iframe src={file.data} style={{width:"100%",height:"calc(100vh - 160px)",border:"none",borderRadius:6,boxShadow:"0 2px 12px rgba(0,0,0,0.15)"}} title={file.name} />
+        ):isImg?(
+          <img src={file.data} alt={file.name} style={{maxWidth:"100%",maxHeight:"calc(100vh - 160px)",objectFit:"contain",borderRadius:6,boxShadow:"0 2px 12px rgba(0,0,0,0.15)"}} />
+        ):(
+          <div style={{...CS,textAlign:"center",padding:40}}>
+            <div style={{fontSize:32,marginBottom:12}}>📄</div>
+            <div style={{fontSize:14,color:C.muted,marginBottom:16}}>Preview not available for this file type.</div>
+            <a href={file.data} download={file.name} style={{...BP,textDecoration:"none",display:"inline-block"}}>Download File</a>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── DOOR DETAIL ───────────────────────────────────────────────────────────────
+function DoorDetail({door,onSave,onDelete}){
+  const [editing,setEditing]=useState(false);
+  const qc=qcStyle(door.qcStatus);
+
+  const uploadImg=async(field,file)=>{
+    if(!file){onSave({...door,[field]:null});return;}
+    const b64=await fileToBase64(file);onSave({...door,[field]:b64});
+  };
+
+  if(editing)return<DoorModal projectId={door.projectId} initial={door} onClose={()=>setEditing(false)} onSave={d=>{onSave(d);setEditing(false);}} existingIds={[]} editing />;
+
+  return(
+    <div style={{padding:"20px 22px",boxSizing:"border-box"}}>
+      {/* Door header */}
+      <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:18,paddingBottom:14,borderBottom:"1px solid rgba(0,0,0,0.1)"}}>
+        <div>
+          <div style={{fontSize:30,fontWeight:500,letterSpacing:"-0.02em",lineHeight:1}}><span style={{color:C.accent}}>#</span>{door.id}</div>
+          <div style={{fontSize:13,color:C.muted,marginTop:4}}>{door.location}</div>
+          <div style={{display:"flex",gap:5,marginTop:8,flexWrap:"wrap"}}>
+            <span style={tag(qc.bg,qc.color)}>{door.qcStatus}</span>
+            {door.thermal&&<span style={tag(door.thermal==="Thermal"?C.successBg:C.infoBg,door.thermal==="Thermal"?C.success:C.info)}>{door.thermal}</span>}
+            {door.swing&&<span style={tag(C.infoBg,C.info)}>{door.swing}</span>}
+            {door.fireRated&&<span style={tag(C.dangerBg,C.danger)}>Fire Rated</span>}
+            {door.transom&&<span style={tag(C.accentLight,C.accent)}>Transom</span>}
+            {door.sidelite&&<span style={tag(C.accentLight,C.accent)}>Sidelite</span>}
+          </div>
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          <button style={BS} onClick={()=>setEditing(true)}>Edit</button>
+          <button style={BDng} onClick={onDelete}>Delete</button>
+        </div>
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+        <Card title="Door Specification">
+          <Row label="Manufacturer" value={door.manufacturer} accent />
+          <Row label="Model / Series" value={door.model} />
+          <Row label="Thermal" value={door.thermal} color={door.thermal==="Thermal"?C.success:C.info} />
+          <Row label="Finish" value={door.finish} />
+          <Row label="Elevation Ref" value={door.elevation} mono />
+        </Card>
+        <Card title="Glass">
+          <Row label="Glass Tag" value={door.glassTag} accent />
+          <Row label="Glass Makeup" value={door.glassMakeup} />
+          <Row label="Glass Size" value={door.glassSize} mono />
+          {door.hasMidrail&&<Row label="Glass Size (Mid Rail)" value={door.glassSizeMidrail} mono />}
+          <Row label="Mid Rail" value={door.hasMidrail?"Yes":"No"} color={door.hasMidrail?C.accent:C.muted} />
+        </Card>
+        <Card title="Hardware">
+          <Row label="Hardware Set" value={door.hwSet} accent />
+          <Row label="Function" value={door.doorFunction} />
+          <Row label="Schedule Ref" value={door.hwSchedule} mono />
+        </Card>
+        <Card title="Fabrication & QC">
+          <Row label="Work Order" value={door.workOrder} accent mono />
+          <Row label="QC Sheet" value={door.qcSheet} mono />
+          <Row label="QC Status" value={door.qcStatus} color={qc.color} />
+          <Row label="QC Date" value={door.qcDate} mono />
+        </Card>
+        {door.hwItems&&door.hwItems.length>0&&(
+          <Card title={`Hardware Set Items — ${door.hwSet}`} full>
+            <div style={{overflowX:"auto"}}>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                <thead>
+                  <tr style={{borderBottom:"1px solid rgba(0,0,0,0.1)"}}>
+                    {["Qty","Description","Part Number","Finish","Item","Mfr","Cutsheets"].map(h=>(
+                      <th key={h} style={{textAlign:"left",padding:"5px 8px",fontSize:10,fontWeight:500,color:C.muted,textTransform:"uppercase",letterSpacing:"0.05em",whiteSpace:"nowrap"}}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {door.hwItems.map((item,i)=>(
+                    <tr key={i} style={{borderBottom:"1px solid rgba(0,0,0,0.05)",background:i%2===0?"transparent":C.surface}}>
+                      <td style={{padding:"6px 8px",fontWeight:500,color:C.accent}}>{item.qty}</td>
+                      <td style={{padding:"6px 8px"}}>{item.description}</td>
+                      <td style={{padding:"6px 8px",fontFamily:"monospace",fontSize:11,color:C.text}}>{item.partNumber}</td>
+                      <td style={{padding:"6px 8px",color:C.muted}}>{item.finish}</td>
+                      <td style={{padding:"6px 8px",fontFamily:"monospace",fontSize:11}}>{item.itemCode}</td>
+                      <td style={{padding:"6px 8px",color:C.muted}}>{item.mfr}</td>
+                      <td style={{padding:"6px 8px"}}>
+                        {item.cutsheetPages&&item.cutsheetPages.length>0?(
+                          <span style={tag(C.infoBg,C.info,{fontSize:10})}>pp. {item.cutsheetPages.join(", ")}</span>
+                        ):<span style={{color:C.hint,fontSize:11}}>—</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )}
+        {door.hwCutsheetSource&&door.hwItems&&door.hwItems.some(i=>i.cutsheetPages&&i.cutsheetPages.length>0)&&(
+          <Card title="Hardware Cutsheets" full>
+            <HardwareCutsheets door={door} />
+          </Card>
+        )}
+        <Card title="Door Elevation">
+          <ImgSlot label="Elevation from Work Order" value={door.elevationImage} field="elevationImage" onUpload={uploadImg} />
+        </Card>
+        <Card title="Floor Plan Location">
+          <ImgSlot label="Floor Plan Snippet" value={door.floorplanImage} field="floorplanImage" onUpload={uploadImg} />
+        </Card>
+        <Card title="Notes & Timeline" full>
+          <NotesTimeline door={door} onSave={onSave} />
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function Card({title,children,full}){return(<div style={{...CS,gridColumn:full?"1 / -1":"auto"}}><div style={{fontSize:11,fontWeight:500,textTransform:"uppercase",letterSpacing:"0.08em",color:C.muted,marginBottom:10,paddingBottom:6,borderBottom:"1px solid rgba(0,0,0,0.1)"}}>{title}</div>{children}</div>);}
+function Row({label,value,accent,mono,color}){return(<div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",padding:"4px 0",borderBottom:"1px solid rgba(0,0,0,0.06)",gap:10}}><span style={{fontSize:11,color:C.muted,whiteSpace:"nowrap",flexShrink:0}}>{label}</span><span style={{fontSize:mono?12:13,fontWeight:500,textAlign:"right",color:color||(accent?C.accent:C.text),fontFamily:mono?"monospace":"inherit",wordBreak:"break-word"}}>{value||"—"}</span></div>);}
+function ImgSlot({label,value,field,onUpload}){
+  const ref=useRef();
+  const [drag,setDrag]=useState(false);
+  const drop=e=>{e.preventDefault();setDrag(false);const f=e.dataTransfer.files[0];if(f)onUpload(field,f);};
+  return value?(
+    <div>
+      <img src={value} alt={label} style={{width:"100%",maxHeight:160,objectFit:"contain",borderRadius:6,border:"1px solid rgba(0,0,0,0.1)"}} />
+      <button style={{...BSm,marginTop:5,fontSize:10}} onClick={()=>onUpload(field,null)}>Remove</button>
+    </div>
+  ):(
+    <div style={{border:`1px dashed ${drag?"#b87514":"rgba(0,0,0,0.18)"}`,background:drag?C.accentLight:"transparent",borderRadius:6,padding:"20px 12px",textAlign:"center",cursor:"pointer",transition:"all 0.15s"}}
+      onClick={()=>ref.current.click()}
+      onDragOver={e=>{e.preventDefault();setDrag(true);}}
+      onDragLeave={()=>setDrag(false)}
+      onDrop={drop}>
+      <div style={{fontSize:12,color:C.muted}}>{drag?"Drop to upload":label}</div>
+      <div style={{fontSize:11,color:C.hint,marginTop:3}}>{drag?"":"Click or drag & drop image"}</div>
+      <input ref={ref} type="file" accept="image/*" style={{display:"none"}} onChange={e=>e.target.files[0]&&onUpload(field,e.target.files[0])} />
+    </div>
+  );
+}
+
+// ── HARDWARE CUTSHEETS VIEWER ─────────────────────────────────────────────────
+function HardwareCutsheets({door}){
+  const [selected,setSelected]=useState(null); // {itemCode, description, pages}
+  const [lightbox,setLightbox]=useState(null);
+
+  // Group items by their cutsheet pages — deduplicate so same pages don't appear twice
+  const groups=[];
+  const seenPageSets=new Set();
+  (door.hwItems||[]).forEach(item=>{
+    if(!item.cutsheetPages||item.cutsheetPages.length===0)return;
+    const key=item.cutsheetPages.sort((a,b)=>a-b).join(",");
+    if(seenPageSets.has(key)){
+      // Add this item to existing group
+      const g=groups.find(g=>g.pageKey===key);
+      if(g)g.items.push(item);
+    }else{
+      seenPageSets.add(key);
+      groups.push({pageKey:key,pages:item.cutsheetPages,items:[item],note:item.cutsheetNote});
+    }
+  });
+
+  return(
+    <div>
+      <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:14}}>
+        {groups.map((g,i)=>{
+          const label=g.items.map(it=>it.itemCode||it.description.split(",")[0]).join(" / ");
+          const isSelected=selected&&selected.pageKey===g.pageKey;
+          return(
+            <button key={i} style={{...BSm,background:isSelected?C.accentLight:"transparent",borderColor:isSelected?C.accent:undefined,color:isSelected?C.accent:C.text,fontSize:11}} onClick={()=>setSelected(isSelected?null:g)}>
+              {label} <span style={{color:C.muted,fontWeight:400}}>(pp. {g.pages.join(", ")})</span>
+            </button>
+          );
+        })}
+      </div>
+      {selected&&(
+        <div>
+          <div style={{fontSize:12,color:C.muted,marginBottom:10}}>
+            <b style={{color:C.text,fontWeight:500}}>{selected.items.map(i=>i.description).join(" / ")}</b>
+            {selected.note&&<span> — {selected.note}</span>}
+          </div>
+          <div style={{background:"#e8e6e0",borderRadius:8,padding:16,display:"flex",alignItems:"flex-start",justifyContent:"center",gap:12,flexWrap:"wrap"}}>
+            {selected.pages.map(pageNum=>(
+              <CutsheetPage key={pageNum} pageNum={pageNum} door={door} onLightbox={setLightbox} />
+            ))}
+          </div>
+        </div>
+      )}
+      {lightbox&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.9)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setLightbox(null)}>
+          <img src={lightbox} style={{maxWidth:"92vw",maxHeight:"92vh",objectFit:"contain",borderRadius:6}} />
+          <button style={{position:"absolute",top:16,right:16,background:"rgba(255,255,255,0.15)",border:"none",color:"#fff",fontSize:20,width:36,height:36,borderRadius:"50%",cursor:"pointer"}} onClick={()=>setLightbox(null)}>✕</button>
+        </div>
+      )}
+      {groups.length===0&&<div style={{fontSize:13,color:C.hint}}>No cutsheet pages matched yet. Run the hardware schedule parse from the project page.</div>}
+    </div>
+  );
+}
+
+function CutsheetPage({pageNum,door,onLightbox}){
+  const [imgSrc,setImgSrc]=useState(null);
+  const [loading,setLoading]=useState(true);
+  const [error,setError]=useState(false);
+
+  useEffect(()=>{
+    if(!door.hwCutsheetSource)return;
+    // Render the PDF page using a canvas via PDF.js if available, otherwise show page reference
+    const render=async()=>{
+      try{
+        if(door.hwCutsheetDocType==="image"){
+          // It's an image, just show it
+          setImgSrc(door.hwCutsheetSource);setLoading(false);return;
+        }
+        // Use PDF.js from CDN to render specific page
+        if(!window.pdfjsLib){
+          // Load PDF.js dynamically
+          await new Promise((res,rej)=>{
+            const s=document.createElement("script");
+            s.src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+            s.onload=res;s.onerror=rej;document.head.appendChild(s);
+          });
+          window.pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+        }
+        const pdfData=atob(door.hwCutsheetSource.split(",")[1]);
+        const arr=new Uint8Array(pdfData.length);
+        for(let i=0;i<pdfData.length;i++)arr[i]=pdfData.charCodeAt(i);
+        const pdf=await window.pdfjsLib.getDocument({data:arr}).promise;
+        const page=await pdf.getPage(pageNum);
+        const scale=1.5;
+        const viewport=page.getViewport({scale});
+        const canvas=document.createElement("canvas");
+        canvas.height=viewport.height;canvas.width=viewport.width;
+        await page.render({canvasContext:canvas.getContext("2d"),viewport}).promise;
+        setImgSrc(canvas.toDataURL());setLoading(false);
+      }catch(e){setError(true);setLoading(false);}
+    };
+    render();
+  },[pageNum,door.hwCutsheetSource]);
+
+  return(
+    <div style={{textAlign:"center"}}>
+      <div style={{fontSize:10,color:C.muted,marginBottom:4}}>Page {pageNum}</div>
+      {loading&&!error&&<div style={{width:200,height:280,background:"rgba(0,0,0,0.08)",borderRadius:4,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:C.muted}}>Loading...</div>}
+      {error&&<div style={{width:200,height:100,background:C.surface,borderRadius:4,border:"1px solid rgba(0,0,0,0.1)",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:4,padding:12}}>
+        <div style={{fontSize:11,color:C.muted}}>Page {pageNum}</div>
+        <div style={{fontSize:10,color:C.hint}}>Preview unavailable</div>
+      </div>}
+      {imgSrc&&!loading&&<img src={imgSrc} onClick={()=>onLightbox(imgSrc)} style={{maxWidth:240,maxHeight:340,objectFit:"contain",borderRadius:4,border:"1px solid rgba(0,0,0,0.1)",cursor:"zoom-in",boxShadow:"0 2px 8px rgba(0,0,0,0.15)"}} />}
+    </div>
+  );
+}
+
+// ── NOTES TIMELINE ────────────────────────────────────────────────────────────
+const CAT_COLORS={
+  "General":{bg:"#f1f5f9",color:"#475569"},
+  "Install":{bg:C.successBg,color:C.success},
+  "QC":{bg:C.infoBg,color:C.info},
+  "Field Issue":{bg:C.warningBg,color:C.warning},
+  "Damage":{bg:C.dangerBg,color:C.danger},
+  "RFI":{bg:"#f5f3ff",color:"#6d28d9"},
+  "Other":{bg:"#f9f8f6",color:C.muted},
+};
+
+function NotesTimeline({door,onSave}){
+  const [text,setText]=useState("");
+  const [cat,setCat]=useState("General");
+  const [photos,setPhotos]=useState([]);
+  const [editingId,setEditingId]=useState(null);
+  const [editText,setEditText]=useState("");
+  const [editCat,setEditCat]=useState("General");
+  const [editDate,setEditDate]=useState("");
+  const [lightbox,setLightbox]=useState(null);
+  const photoRef=useRef();
+  const timeline=door.timeline||[];
+
+  const addPhotos=async(e)=>{
+    const files=Array.from(e.target.files);
+    const b64s=await Promise.all(files.map(fileToBase64));
+    setPhotos(prev=>[...prev,...b64s]);
+    e.target.value="";
+  };
+
+  const addNote=()=>{
+    if(!text.trim()&&photos.length===0)return;
+    const entry={id:`n-${Date.now()}`,ts:new Date().toISOString(),category:cat,text:text.trim(),photos:[...photos]};
+    onSave({...door,timeline:[entry,...timeline]});
+    setText("");setPhotos([]);setCat("General");
+  };
+
+  const deleteNote=id=>onSave({...door,timeline:timeline.filter(n=>n.id!==id)});
+
+  const startEdit=n=>{setEditingId(n.id);setEditText(n.text);setEditCat(n.category);setEditDate(n.ts.slice(0,16));};
+  const commitEdit=id=>{
+    onSave({...door,timeline:timeline.map(n=>n.id===id?{...n,text:editText,category:editCat,ts:new Date(editDate).toISOString()}:n)});
+    setEditingId(null);
+  };
+
+  const fmtDate=ts=>{
+    try{const d=new Date(ts);return d.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})+" · "+d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"});}catch{return ts;}
+  };
+
+  return(
+    <div>
+      {/* Add note */}
+      <div style={{background:C.surface,border:"1px solid rgba(0,0,0,0.1)",borderRadius:8,padding:12,marginBottom:16}}>
+        <div style={{display:"flex",gap:8,marginBottom:8}}>
+          <select style={{...IS,width:"auto",fontSize:12}} value={cat} onChange={e=>setCat(e.target.value)}>
+            {NOTE_CATEGORIES.map(c=><option key={c}>{c}</option>)}
+          </select>
+          <button style={{...BSm,fontSize:11}} onClick={()=>photoRef.current.click()}>+ Photos{photos.length>0?` (${photos.length})`:""}</button>
+          <input ref={photoRef} type="file" accept="image/*" multiple style={{display:"none"}} onChange={addPhotos} />
+        </div>
+        {photos.length>0&&(
+          <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
+            {photos.map((p,i)=>(
+              <div key={i} style={{position:"relative"}}>
+                <img src={p} style={{width:56,height:56,objectFit:"cover",borderRadius:4,border:"1px solid rgba(0,0,0,0.1)",cursor:"pointer"}} onClick={()=>setLightbox(p)} />
+                <button onClick={()=>setPhotos(ps=>ps.filter((_,j)=>j!==i))} style={{position:"absolute",top:-4,right:-4,width:16,height:16,borderRadius:"50%",background:C.danger,color:"#fff",border:"none",cursor:"pointer",fontSize:10,display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>✕</button>
+              </div>
+            ))}
+          </div>
+        )}
+        <div style={{display:"flex",gap:8,alignItems:"flex-end"}}>
+          <textarea style={{...IS,flex:1,minHeight:56,resize:"vertical",lineHeight:1.5}} value={text} onChange={e=>setText(e.target.value)} placeholder="Add a note..." onKeyDown={e=>{if(e.key==="Enter"&&e.metaKey)addNote();}} />
+          <button style={{...BP,alignSelf:"flex-end",whiteSpace:"nowrap"}} onClick={addNote}>Add</button>
+        </div>
+        <div style={{fontSize:10,color:C.hint,marginTop:4}}>Cmd+Enter to save</div>
+      </div>
+
+      {/* Timeline */}
+      {timeline.length===0&&<div style={{fontSize:13,color:C.hint,textAlign:"center",padding:"20px 0"}}>No notes yet. Add the first entry above.</div>}
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {timeline.map(n=>{
+          const cc=CAT_COLORS[n.category]||CAT_COLORS["Other"];
+          return(
+            <div key={n.id} style={{background:C.card,border:"1px solid rgba(0,0,0,0.08)",borderRadius:8,overflow:"hidden"}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 12px",background:C.surface,borderBottom:"1px solid rgba(0,0,0,0.06)"}}>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <span style={tag(cc.bg,cc.color,{fontSize:10})}>{n.category}</span>
+                  <span style={{fontSize:11,color:C.muted}}>{fmtDate(n.ts)}</span>
+                </div>
+                <div style={{display:"flex",gap:6}}>
+                  <button style={{...BSm,fontSize:10,padding:"2px 7px"}} onClick={()=>startEdit(n)}>Edit</button>
+                  <button style={{...BDng,fontSize:10,padding:"2px 7px"}} onClick={()=>deleteNote(n.id)}>Delete</button>
+                </div>
+              </div>
+              <div style={{padding:"10px 12px"}}>
+                {editingId===n.id?(
+                  <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                    <div style={{display:"flex",gap:8}}>
+                      <select style={{...IS,width:"auto",fontSize:12}} value={editCat} onChange={e=>setEditCat(e.target.value)}>{NOTE_CATEGORIES.map(c=><option key={c}>{c}</option>)}</select>
+                      <div style={{display:"flex",flexDirection:"column",gap:2,flex:1}}>
+                        <label style={{fontSize:10,color:C.muted}}>Date &amp; Time</label>
+                        <input type="datetime-local" style={{...IS,fontSize:12}} value={editDate} onChange={e=>setEditDate(e.target.value)} />
+                      </div>
+                    </div>
+                    <textarea style={{...IS,minHeight:56,resize:"vertical"}} value={editText} onChange={e=>setEditText(e.target.value)} />
+                    <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+                      <button style={BSm} onClick={()=>setEditingId(null)}>Cancel</button>
+                      <button style={BP} onClick={()=>commitEdit(n.id)}>Save</button>
+                    </div>
+                  </div>
+                ):(
+                  <>
+                    {n.text&&<p style={{fontSize:13,lineHeight:1.6,margin:0,whiteSpace:"pre-wrap"}}>{n.text}</p>}
+                    {n.photos&&n.photos.length>0&&(
+                      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:n.text?8:0}}>
+                        {n.photos.map((p,i)=>(
+                          <img key={i} src={p} onClick={()=>setLightbox(p)} style={{width:72,height:72,objectFit:"cover",borderRadius:5,border:"1px solid rgba(0,0,0,0.1)",cursor:"pointer",transition:"transform 0.1s"}} onMouseEnter={e=>e.currentTarget.style.transform="scale(1.05)"} onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"} />
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Lightbox */}
+      {lightbox&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setLightbox(null)}>
+          <img src={lightbox} style={{maxWidth:"92vw",maxHeight:"92vh",objectFit:"contain",borderRadius:6}} />
+          <button style={{position:"absolute",top:16,right:16,background:"rgba(255,255,255,0.15)",border:"none",color:"#fff",fontSize:20,width:36,height:36,borderRadius:"50%",cursor:"pointer"}} onClick={()=>setLightbox(null)}>✕</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── DOOR MODAL — stable inputs, no re-render focus loss ───────────────────────
+function DoorModal({projectId,initial,onClose,onSave,existingIds,editing}){
+  // Use a ref for the form data and local state only for controlled inputs
+  const [form,setForm]=useState(()=>initial?{...initial}:{...EMPTY_DOOR,projectId});
+
+  // Stable setter that doesn't cause full re-renders of child inputs
+  const setField=useCallback((k,v)=>setForm(prev=>({...prev,[k]:v})),[]);
+
+  const save=useCallback(()=>{
+    if(!form.id.trim())return alert("Door ID required.");
+    if(!editing&&existingIds.includes(form.id))return alert("Door ID already exists in this project.");
+    onSave({...form,projectId,files:form.files||[]});
+  },[form,editing,existingIds,onSave,projectId]);
+
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:200,overflowY:"auto",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:"32px 16px"}}>
+      <div style={{...CS,width:640,maxWidth:"100%",boxShadow:"0 8px 32px rgba(0,0,0,0.15)"}}>
+        <div style={{fontSize:16,fontWeight:500,marginBottom:18}}>{editing?`Edit — ${form.id}`:"Add Door"}</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+          <div style={divSty}>Identification</div>
+          <StableInput label="Door ID *" value={form.id} onChange={v=>setField("id",v)} />
+          <StableInput label="Location" value={form.location} onChange={v=>setField("location",v)} />
+
+          <div style={divSty}>Door Specs</div>
+          <StableInput label="Manufacturer" value={form.manufacturer} onChange={v=>setField("manufacturer",v)} />
+          <StableInput label="Model / Series" value={form.model} onChange={v=>setField("model",v)} />
+          <StableSelect label="Thermal" value={form.thermal} onChange={v=>setField("thermal",v)} opts={["Thermal","Non-Thermal"]} />
+          <StableInput label="Finish" value={form.finish} onChange={v=>setField("finish",v)} />
+          <StableInput label="Elevation Ref" value={form.elevation} onChange={v=>setField("elevation",v)} />
+          <StableSelect label="Door Swing" value={form.swing} onChange={v=>setField("swing",v)} opts={SWING_OPTIONS} />
+          <div style={{gridColumn:"1/-1",display:"flex",gap:20}}>
+            {[["Transom","transom"],["Sidelite","sidelite"],["Fire Rated","fireRated"]].map(([lbl,id])=>(
+              <label key={id} style={{display:"flex",alignItems:"center",gap:7,cursor:"pointer",fontSize:13}}>
+                <input type="checkbox" checked={!!form[id]} onChange={e=>setField(id,e.target.checked)} />
+                {lbl}
+              </label>
+            ))}
+          </div>
+
+          <div style={divSty}>Glass</div>
+          <StableInput label="Glass Tag" value={form.glassTag} onChange={v=>setField("glassTag",v)} />
+          <StableInput label="Glass Makeup" value={form.glassMakeup} onChange={v=>setField("glassMakeup",v)} full />
+          <StableInput label="Glass Size" value={form.glassSize} onChange={v=>setField("glassSize",v)} />
+          <div style={{display:"flex",alignItems:"center",gap:8,alignSelf:"flex-end",paddingBottom:2}}>
+            <label style={{display:"flex",alignItems:"center",gap:7,cursor:"pointer",fontSize:13}}>
+              <input type="checkbox" checked={!!form.hasMidrail} onChange={e=>setField("hasMidrail",e.target.checked)} />
+              Has Mid Rail?
+            </label>
+          </div>
+          {form.hasMidrail&&<StableInput label="Glass Size (Mid Rail)" value={form.glassSizeMidrail} onChange={v=>setField("glassSizeMidrail",v)} />}
+
+          <div style={divSty}>Hardware</div>
+          <StableInput label="Hardware Set" value={form.hwSet} onChange={v=>setField("hwSet",v)} />
+          <StableSelect label="Door Function" value={form.doorFunction} onChange={v=>setField("doorFunction",v)} opts={DOOR_FUNCTIONS} />
+          <StableInput label="Hardware Schedule Ref" value={form.hwSchedule} onChange={v=>setField("hwSchedule",v)} full />
+
+          <div style={divSty}>Fabrication & QC</div>
+          <StableInput label="Work Order #" value={form.workOrder} onChange={v=>setField("workOrder",v)} />
+          <StableInput label="QC Sheet Ref" value={form.qcSheet} onChange={v=>setField("qcSheet",v)} />
+          <StableSelect label="QC Status" value={form.qcStatus} onChange={v=>setField("qcStatus",v)} opts={QC_OPTIONS} />
+          <StableInput label="QC Date" value={form.qcDate} onChange={v=>setField("qcDate",v)} type="date" />
+
+          <div style={divSty}>Notes</div>
+          <div style={{gridColumn:"1/-1",fontSize:12,color:C.muted,padding:"4px 0"}}>Notes and photos are managed via the timeline on the door detail page.</div>
+        </div>
+        <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:18}}>
+          <button style={BS} onClick={onClose}>Cancel</button>
+          <button style={BP} onClick={save}>Save Door</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Stable input — onChange receives the value string, parent stores it
+// No re-render of the input itself unless value prop changes
+function StableInput({label,value,onChange,type,full}){
+  const ref=useRef();
+  // Sync external value changes without stealing focus
+  useEffect(()=>{if(ref.current&&document.activeElement!==ref.current)ref.current.value=value||"";},[value]);
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:4,gridColumn:full?"1/-1":"auto"}}>
+      <label style={LS}>{label}</label>
+      <input ref={ref} style={IS} type={type||"text"} defaultValue={value||""} onChange={e=>onChange(e.target.value)} />
+    </div>
+  );
+}
+function StableSelect({label,value,onChange,opts,full}){
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:4,gridColumn:full?"1/-1":"auto"}}>
+      <label style={LS}>{label}</label>
+      <select style={IS} value={value||""} onChange={e=>onChange(e.target.value)}>
+        <option value="">— select —</option>
+        {opts.map(o=><option key={o}>{o}</option>)}
+      </select>
+    </div>
+  );
+}
+
+// ── PROJECT WIZARD ────────────────────────────────────────────────────────────
+function ProjectWizard({apiKey,onClose,onSave}){
+  const [step,setStep]=useState(1);
+  const [proj,setProj]=useState({id:`proj-${Date.now()}`,jobNumber:"",name:"",address:"",scheduleApproved:false,createdAt:new Date().toISOString()});
+  const [pdfFile,setPdfFile]=useState(null);
+  const [parsing,setParsing]=useState(false);
+  const [parsedDoors,setParsedDoors]=useState([]);
+  const [parseError,setParseError]=useState("");
+  const [wizStep,setWizStep]=useState(0);
+  const [completedDoors,setCompletedDoors]=useState([]);
+  const [curDoor,setCurDoor]=useState(null);
+  const [dragOver,setDragOver]=useState(false);
+  // Project-wide defaults
+  const [defaults,setDefaults]=useState({manufacturer:"",model:"",thermal:"Thermal",glassTag:"",glassMakeup:"",glassSize:"",workOrderPrefix:""});
+  const [useDefault,setUseDefault]=useState({manufacturer:false,model:false,thermal:false,glassTag:false,glassMakeup:false,glassSize:false,workOrderPrefix:false});
+  const fileRef=useRef();
+  const setP=(k,v)=>setProj(p=>({...p,[k]:v}));
+  const setDef=(k,v)=>setDefaults(d=>({...d,[k]:v}));
+  const toggleDef=(k,v)=>{
+    setUseDefault(u=>({...u,[k]:v}));
+    // When enabling, apply to current and remaining doors
+    if(v&&curDoor) setCurDoor(d=>({...d,[k]:defaults[k]}));
+  };
+
+  const parseSchedule=async()=>{
+    if(!pdfFile)return;if(!apiKey){setParseError("No API key. Go to Settings.");return;}
+    setParsing(true);setParseError("");
+    try{
+      const b64=await fileToBase64(pdfFile);const isImg=pdfFile.type.startsWith("image/");
+      const content=[
+        {type:isImg?"image":"document",source:{type:"base64",media_type:isImg?pdfFile.type:"application/pdf",data:b64.split(",")[1]}},
+        {type:"text",text:`Extract all doors from this hardware schedule. Return ONLY valid JSON.\nFormat: {"doors":[{"id":"109A","hwSet":"SF-1","doorFunction":"Entrance / Vestibule","swing":"Pair - Active RH","transom":false,"sidelite":false,"fireRated":false,"location":"","elevation":"","hwSchedule":"","workOrder":"","qcSheet":"","qcStatus":"Pending","qcDate":""}]}\nExtract: door ID, hardware set, door function if stated, swing direction if stated (use formats like LH Inswing, RH Outswing, Pair - Active LH, etc.), fire-rated if noted. Leave manufacturer/model/glass blank.`}
+      ];
+      const raw=await callClaude([{role:"user",content}],"You are a construction document parser. Extract door data from hardware schedules. You MUST return ONLY a raw JSON object. Start with { end with }. Nothing else.",apiKey);
+      const parsed=extractJSON(raw);
+      const ds=(parsed.doors||[]).map(d=>({...EMPTY_DOOR,...d,projectId:proj.id,files:[],timeline:[],hwItems:[],hwCutsheets:[]}));
+      if(ds.length===0)throw new Error("No doors found in document");
+      setParsedDoors(ds);setStep(3);
+    }catch(e){setParseError("Could not parse: "+e.message);}
+    setParsing(false);
+  };
+
+  const applyDefaults=(door)=>{
+    const out={...door};
+    Object.keys(useDefault).forEach(k=>{
+      if(useDefault[k]&&defaults[k]){
+        if(k==="workOrderPrefix") out.workOrder=defaults[k]+door.id;
+        else out[k]=defaults[k];
+      }
+    });
+    return out;
+  };
+
+  const finishNow=()=>onSave(proj,parsedDoors.length>0?parsedDoors.map(applyDefaults):[]);
+  const startWizard=()=>{setWizStep(0);setCurDoor(applyDefaults({...parsedDoors[0]}));setStep(4);};
+  const uploadWizImg=async(field,file)=>{if(!file){setCurDoor(d=>({...d,[field]:null}));return;}const b64=await fileToBase64(file);setCurDoor(d=>({...d,[field]:b64}));};
+
+  const nextWizDoor=()=>{
+    const all=[...completedDoors,curDoor];
+    if(wizStep+1<parsedDoors.length){
+      setCompletedDoors(all);
+      setWizStep(wizStep+1);
+      setCurDoor(applyDefaults({...parsedDoors[wizStep+1]}));
+    }else onSave(proj,all);
+  };
+
+  const handleFileDrop=(e)=>{e.preventDefault();setDragOver(false);const f=e.dataTransfer.files[0];if(f)setPdfFile(f);};
+
+  const STEPS=["Project Info","Upload Schedule","Review Doors","Per-Door Details"];
+
+  // Default field config
+  const DEF_FIELDS=[
+    {key:"manufacturer",label:"Manufacturer"},
+    {key:"model",label:"Model / Series"},
+    {key:"thermal",label:"Thermal",type:"select",opts:["Thermal","Non-Thermal"]},
+    {key:"glassTag",label:"Glass Tag"},
+    {key:"glassMakeup",label:"Glass Makeup"},
+    {key:"glassSize",label:"Glass Size"},
+    {key:"workOrderPrefix",label:"Work Order Prefix"},
+  ];
+
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+      <div style={{...CS,width:600,maxWidth:"100%",maxHeight:"92vh",overflowY:"auto",boxShadow:"0 8px 40px rgba(0,0,0,0.18)"}}>
+        <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:22,flexWrap:"wrap"}}>
+          {STEPS.map((s,i)=>(<div key={i} style={{display:"flex",alignItems:"center",gap:5}}>
+            <div style={{width:22,height:22,borderRadius:"50%",background:step>i+1?C.success:step===i+1?C.accent:C.border,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:500,flexShrink:0}}>{step>i+1?"✓":i+1}</div>
+            <span style={{fontSize:11,color:step===i+1?C.text:C.muted}}>{s}</span>
+            {i<STEPS.length-1&&<span style={{color:C.border,fontSize:14}}>›</span>}
+          </div>))}
+        </div>
+
+        {/* STEP 1 — Project info + project defaults */}
+        {step===1&&<>
+          <h3 style={{fontSize:16,fontWeight:500,margin:"0 0 16px"}}>New Project</h3>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:20}}>
+            <div style={{display:"flex",flexDirection:"column",gap:4}}><label style={LS}>Job Number</label><input style={IS} value={proj.jobNumber} onChange={e=>setP("jobNumber",e.target.value)} placeholder="e.g. 2024-047" /></div>
+            <div style={{display:"flex",flexDirection:"column",gap:4}}><label style={LS}>Project Name *</label><input style={IS} value={proj.name} onChange={e=>setP("name",e.target.value)} placeholder="e.g. Riverside Medical Center" /></div>
+            <div style={{display:"flex",flexDirection:"column",gap:4,gridColumn:"1/-1"}}><label style={LS}>Address (optional)</label><input style={IS} value={proj.address} onChange={e=>setP("address",e.target.value)} /></div>
+            <div style={{display:"flex",alignItems:"center",gap:8,gridColumn:"1/-1"}}><input type="checkbox" id="sa" checked={proj.scheduleApproved} onChange={e=>setP("scheduleApproved",e.target.checked)} /><label htmlFor="sa" style={{fontSize:13}}>Hardware schedule is architect-approved</label></div>
+          </div>
+          {/* Project-wide defaults */}
+          <div style={{borderTop:"1px solid rgba(0,0,0,0.1)",paddingTop:16,marginBottom:4}}>
+            <div style={{fontSize:12,fontWeight:500,color:C.muted,marginBottom:10,textTransform:"uppercase",letterSpacing:"0.06em"}}>Project Defaults (optional)</div>
+            <p style={{fontSize:12,color:C.hint,marginBottom:12}}>Set values that apply to most doors. These auto-fill the wizard but can be overridden per door.</p>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              {DEF_FIELDS.map(f=>(
+                <div key={f.key} style={{display:"flex",flexDirection:"column",gap:3}}>
+                  <label style={LS}>{f.label}</label>
+                  {f.type==="select"?(
+                    <select style={IS} value={defaults[f.key]} onChange={e=>setDef(f.key,e.target.value)}>
+                      {f.opts.map(o=><option key={o}>{o}</option>)}
+                    </select>
+                  ):(
+                    <input style={IS} value={defaults[f.key]} onChange={e=>setDef(f.key,e.target.value)} placeholder={f.key==="workOrderPrefix"?"e.g. WO-2025-":""} />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:20}}><button style={BS} onClick={onClose}>Cancel</button><button style={BP} onClick={()=>proj.name.trim()&&setStep(2)} disabled={!proj.name.trim()}>Next</button></div>
+        </>}
+
+        {/* STEP 2 — Upload */}
+        {step===2&&<>
+          <h3 style={{fontSize:16,fontWeight:500,margin:"0 0 6px"}}>Upload Hardware Schedule</h3>
+          <p style={{fontSize:13,color:C.muted,margin:"0 0 16px"}}>AI reads the schedule and creates all doors including swing direction. Requires an Anthropic API key (set in Settings).</p>
+          <div
+            style={{border:`1px dashed ${dragOver?"#b87514":"rgba(0,0,0,0.18)"}`,background:dragOver?C.accentLight:"transparent",borderRadius:8,padding:28,textAlign:"center",cursor:"pointer",marginBottom:14,transition:"all 0.15s"}}
+            onClick={()=>fileRef.current.click()}
+            onDragOver={e=>{e.preventDefault();setDragOver(true);}}
+            onDragLeave={()=>setDragOver(false)}
+            onDrop={handleFileDrop}>
+            {pdfFile?<div><div style={{fontSize:14,fontWeight:500}}>{pdfFile.name}</div><div style={{fontSize:12,color:C.muted,marginTop:3}}>Click or drop to change</div></div>
+            :<div><div style={{fontSize:13,color:C.muted}}>Click or drag & drop hardware schedule here</div><div style={{fontSize:12,color:C.hint,marginTop:3}}>PDF · JPG · PNG</div></div>}
+            <input ref={fileRef} type="file" accept=".pdf,image/*" style={{display:"none"}} onChange={e=>e.target.files[0]&&setPdfFile(e.target.files[0])} />
+          </div>
+          {!apiKey&&<div style={{fontSize:12,color:C.warning,marginBottom:10,padding:"7px 10px",background:C.warningBg,borderRadius:5}}>No API key set — go to Settings before parsing.</div>}
+          {parseError&&<div style={{fontSize:12,color:C.danger,marginBottom:12,padding:"8px 12px",background:C.dangerBg,borderRadius:5}}>{parseError}</div>}
+          <div style={{display:"flex",justifyContent:"space-between",gap:8}}>
+            <button style={BS} onClick={()=>setStep(1)}>Back</button>
+            <div style={{display:"flex",gap:8}}>
+              <button style={BS} onClick={()=>{setParsedDoors([]);setStep(3);}}>Skip — add manually</button>
+              <button style={BP} onClick={parseSchedule} disabled={!pdfFile||parsing}>{parsing?"Parsing...":"Parse Schedule"}</button>
+            </div>
+          </div>
+        </>}
+
+        {/* STEP 3 — Review */}
+        {step===3&&<>
+          <h3 style={{fontSize:16,fontWeight:500,margin:"0 0 6px"}}>{parsedDoors.length>0?`${parsedDoors.length} doors found`:"Ready to continue"}</h3>
+          <p style={{fontSize:13,color:C.muted,margin:"0 0 16px"}}>{parsedDoors.length>0?"Review below, then walk through each door to confirm details and add images.":"No doors extracted. Add them manually after creating the project."}</p>
+          {parsedDoors.length>0&&(
+            <div style={{maxHeight:240,overflowY:"auto",border:"1px solid rgba(0,0,0,0.1)",borderRadius:6,marginBottom:16}}>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",padding:"5px 12px",borderBottom:"1px solid rgba(0,0,0,0.1)",background:C.surface}}>
+                {["Door","Set","Swing"].map(h=><span key={h} style={{fontSize:10,fontWeight:500,textTransform:"uppercase",letterSpacing:"0.05em",color:C.muted}}>{h}</span>)}
+              </div>
+              {parsedDoors.map((d,i)=>(
+                <div key={i} style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",padding:"6px 12px",borderBottom:"1px solid rgba(0,0,0,0.07)",fontSize:12}}>
+                  <span style={{fontWeight:500}}>{d.id}</span>
+                  <span style={{color:C.muted}}>{d.hwSet}</span>
+                  <span style={{color:d.swing?C.text:C.hint}}>{d.swing||"—"}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          <div style={{display:"flex",justifyContent:"space-between",gap:8}}>
+            <button style={BS} onClick={()=>setStep(2)}>Back</button>
+            <div style={{display:"flex",gap:8}}>
+              <button style={BS} onClick={finishNow}>Save & finish later</button>
+              {parsedDoors.length>0?<button style={BP} onClick={startWizard}>Walk through doors</button>:<button style={BP} onClick={finishNow}>Create Project</button>}
+            </div>
+          </div>
+        </>}
+
+        {/* STEP 4 — Per-door */}
+        {step===4&&curDoor&&<>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+            <h3 style={{fontSize:16,fontWeight:500,margin:0}}>Door {wizStep+1} of {parsedDoors.length}</h3>
+            <span style={{fontSize:24,fontWeight:500,color:C.accent}}>{curDoor.id}</span>
+          </div>
+          <div style={{background:C.surface,borderRadius:6,padding:"7px 12px",fontSize:13,color:C.muted,marginBottom:14}}>
+            <b style={{color:C.text,fontWeight:500}}>{curDoor.hwSet}</b>{curDoor.doorFunction?` · ${curDoor.doorFunction}`:""}
+            {curDoor.swing&&<span style={{marginLeft:8,...tag(C.infoBg,C.info,{fontSize:11,padding:"1px 6px"})}}>{curDoor.swing}</span>}
+          </div>
+
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            {/* Identification */}
+            <div style={divSty}>Identification &amp; Location</div>
+            <WizField label="Location / Grid Ref" value={curDoor.location||""} onChange={v=>setCurDoor(d=>({...d,location:v}))} />
+            <WizField label="Elevation Ref" value={curDoor.elevation||""} onChange={v=>setCurDoor(d=>({...d,elevation:v}))} />
+
+            {/* Door specs with defaults */}
+            <div style={divSty}>Door Specs</div>
+            <WizFieldDefault label="Manufacturer" fieldKey="manufacturer" curDoor={curDoor} setCurDoor={setCurDoor} defaults={defaults} setDef={setDef} useDefault={useDefault} toggleDef={toggleDef} />
+            <WizFieldDefault label="Model / Series" fieldKey="model" curDoor={curDoor} setCurDoor={setCurDoor} defaults={defaults} setDef={setDef} useDefault={useDefault} toggleDef={toggleDef} />
+            <WizFieldDefaultSelect label="Thermal" fieldKey="thermal" opts={["Thermal","Non-Thermal"]} curDoor={curDoor} setCurDoor={setCurDoor} defaults={defaults} setDef={setDef} useDefault={useDefault} toggleDef={toggleDef} />
+            <WizField label="Finish" value={curDoor.finish||""} onChange={v=>setCurDoor(d=>({...d,finish:v}))} />
+            <div style={{display:"flex",flexDirection:"column",gap:4}}>
+              <label style={LS}>Door Swing <span style={{color:C.success,fontWeight:400,textTransform:"none",letterSpacing:0}}>{curDoor.swing?"(from schedule)":""}</span></label>
+              <select style={IS} value={curDoor.swing||""} onChange={e=>setCurDoor(d=>({...d,swing:e.target.value}))}>
+                <option value="">— select —</option>
+                {SWING_OPTIONS.map(o=><option key={o}>{o}</option>)}
+              </select>
+            </div>
+            <WizField label="Door Function" value={curDoor.doorFunction||""} onChange={v=>setCurDoor(d=>({...d,doorFunction:v}))} select opts={DOOR_FUNCTIONS} />
+            <div style={{gridColumn:"1/-1",display:"flex",gap:16,flexWrap:"wrap"}}>
+              {[["Transom","transom"],["Sidelite","sidelite"],["Fire Rated","fireRated"]].map(([lbl,k])=>(
+                <label key={k} style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer",fontSize:13}}>
+                  <input type="checkbox" checked={!!curDoor[k]} onChange={e=>setCurDoor(d=>({...d,[k]:e.target.checked}))} />{lbl}
+                </label>
+              ))}
+            </div>
+
+            {/* Glass with defaults */}
+            <div style={divSty}>Glass</div>
+            <WizFieldDefault label="Glass Tag" fieldKey="glassTag" curDoor={curDoor} setCurDoor={setCurDoor} defaults={defaults} setDef={setDef} useDefault={useDefault} toggleDef={toggleDef} />
+            <WizFieldDefault label="Glass Makeup" fieldKey="glassMakeup" curDoor={curDoor} setCurDoor={setCurDoor} defaults={defaults} setDef={setDef} useDefault={useDefault} toggleDef={toggleDef} full />
+            <WizFieldDefault label="Glass Size" fieldKey="glassSize" curDoor={curDoor} setCurDoor={setCurDoor} defaults={defaults} setDef={setDef} useDefault={useDefault} toggleDef={toggleDef} />
+            <div style={{display:"flex",alignItems:"center",gap:7,alignSelf:"flex-end",paddingBottom:4}}>
+              <label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer",fontSize:13}}>
+                <input type="checkbox" checked={!!curDoor.hasMidrail} onChange={e=>setCurDoor(d=>({...d,hasMidrail:e.target.checked}))} />Has Mid Rail?
+              </label>
+            </div>
+            {curDoor.hasMidrail&&<WizField label="Glass Size (Mid Rail)" value={curDoor.glassSizeMidrail||""} onChange={v=>setCurDoor(d=>({...d,glassSizeMidrail:v}))} />}
+
+            {/* Fab & QC */}
+            <div style={divSty}>Fabrication &amp; QC</div>
+            <WizFieldDefault label="Work Order #" fieldKey="workOrderPrefix" curDoor={curDoor} setCurDoor={setCurDoor} defaults={defaults} setDef={setDef} useDefault={useDefault} toggleDef={toggleDef} woMode />
+            <WizField label="QC Sheet Ref" value={curDoor.qcSheet||""} onChange={v=>setCurDoor(d=>({...d,qcSheet:v}))} />
+            <div style={{display:"flex",flexDirection:"column",gap:4}}>
+              <label style={LS}>QC Status</label>
+              <select style={IS} value={curDoor.qcStatus||"Pending"} onChange={e=>setCurDoor(d=>({...d,qcStatus:e.target.value}))}>{QC_OPTIONS.map(o=><option key={o}>{o}</option>)}</select>
+            </div>
+            <WizField label="QC Date" value={curDoor.qcDate||""} onChange={v=>setCurDoor(d=>({...d,qcDate:v}))} type="date" />
+
+            {/* Images */}
+            <div style={divSty}>Images</div>
+            <WizImg label="Elevation Image" field="elevationImage" value={curDoor.elevationImage} onUpload={uploadWizImg} />
+            <WizImg label="Floor Plan Snippet" field="floorplanImage" value={curDoor.floorplanImage} onUpload={uploadWizImg} />
+          </div>
+
+          <div style={{display:"flex",justifyContent:"space-between",gap:8,marginTop:18}}>
+            <button style={BS} onClick={finishNow}>Save & finish later</button>
+            <button style={BP} onClick={nextWizDoor}>{wizStep+1<parsedDoors.length?"Next Door →":"Finish & Save"}</button>
+          </div>
+        </>}
+      </div>
+    </div>
+  );
+}
+
+// Wizard field helpers
+function WizField({label,value,onChange,type,select,opts,full}){
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:4,gridColumn:full?"1/-1":"auto"}}>
+      <label style={LS}>{label}</label>
+      {select?(
+        <select style={IS} value={value} onChange={e=>onChange(e.target.value)}>
+          <option value="">— select —</option>
+          {(opts||[]).map(o=><option key={o}>{o}</option>)}
+        </select>
+      ):(
+        <input style={IS} type={type||"text"} value={value} onChange={e=>onChange(e.target.value)} />
+      )}
+    </div>
+  );
+}
+function WizFieldDefault({label,fieldKey,curDoor,setCurDoor,defaults,setDef,useDefault,toggleDef,full,woMode}){
+  const isDefault=useDefault[fieldKey];
+  const displayVal=woMode?(curDoor.workOrder||""):(curDoor[fieldKey]||"");
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:3,gridColumn:full?"1/-1":"auto"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <label style={LS}>{label}</label>
+        <label style={{display:"flex",alignItems:"center",gap:4,cursor:"pointer",fontSize:10,color:isDefault?C.accent:C.hint}}>
+          <input type="checkbox" checked={isDefault} onChange={e=>{
+            if(e.target.checked&&!defaults[fieldKey]){
+              const v=woMode?(curDoor.workOrder||""):(curDoor[fieldKey]||"");
+              setDef(fieldKey,v);
+            }
+            toggleDef(fieldKey,e.target.checked);
+          }} style={{width:11,height:11}} />
+          default for all
+        </label>
+      </div>
+      <input style={{...IS,background:isDefault?C.accentLight:IS.background,borderColor:isDefault?C.accent:undefined}} value={displayVal}
+        onChange={e=>{
+          const v=e.target.value;
+          if(woMode) setCurDoor(d=>({...d,workOrder:v}));
+          else setCurDoor(d=>({...d,[fieldKey]:v}));
+          if(isDefault) setDef(fieldKey,v);
+        }} />
+    </div>
+  );
+}
+function WizFieldDefaultSelect({label,fieldKey,opts,curDoor,setCurDoor,defaults,setDef,useDefault,toggleDef}){
+  const isDefault=useDefault[fieldKey];
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:3}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <label style={LS}>{label}</label>
+        <label style={{display:"flex",alignItems:"center",gap:4,cursor:"pointer",fontSize:10,color:isDefault?C.accent:C.hint}}>
+          <input type="checkbox" checked={isDefault} onChange={e=>{toggleDef(fieldKey,e.target.checked);}} style={{width:11,height:11}} />
+          default for all
+        </label>
+      </div>
+      <select style={{...IS,background:isDefault?C.accentLight:IS.background,borderColor:isDefault?C.accent:undefined}}
+        value={curDoor[fieldKey]||""} onChange={e=>{
+          setCurDoor(d=>({...d,[fieldKey]:e.target.value}));
+          if(isDefault) setDef(fieldKey,e.target.value);
+        }}>
+        {opts.map(o=><option key={o}>{o}</option>)}
+      </select>
+    </div>
+  );
+}
+
+function WizImg({label,field,value,onUpload}){
+  const ref=useRef();
+  const [drag,setDrag]=useState(false);
+  const drop=e=>{e.preventDefault();setDrag(false);const f=e.dataTransfer.files[0];if(f)onUpload(field,f);};
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:4}}>
+      <label style={LS}>{label}</label>
+      {value?(
+        <div>
+          <img src={value} alt={label} style={{width:"100%",maxHeight:90,objectFit:"contain",borderRadius:6,border:"1px solid rgba(0,0,0,0.1)"}} />
+          <button style={{...BSm,marginTop:4,fontSize:10}} onClick={()=>onUpload(field,null)}>Remove</button>
+        </div>
+      ):(
+        <div style={{border:`1px dashed ${drag?"#b87514":"rgba(0,0,0,0.18)"}`,background:drag?C.accentLight:"transparent",borderRadius:6,padding:"14px 10px",textAlign:"center",cursor:"pointer",fontSize:12,color:C.muted,transition:"all 0.15s"}}
+          onClick={()=>ref.current.click()}
+          onDragOver={e=>{e.preventDefault();setDrag(true);}}
+          onDragLeave={()=>setDrag(false)}
+          onDrop={drop}>
+          {drag?"Drop to upload":"Click or drag & drop image"}
+          <input ref={ref} type="file" accept="image/*" style={{display:"none"}} onChange={e=>e.target.files[0]&&onUpload(field,e.target.files[0])} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── SETTINGS MODAL ────────────────────────────────────────────────────────────
+function SettingsModal({apiKey,setApiKey,onClose,projects,doors,setProjects,setDoors}){
+  const [key,setKey]=useState(apiKey);const importRef=useRef();
+  const exportData=()=>{const blob=new Blob([JSON.stringify({projects,doors},null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="door-registry-backup.json";a.click();};
+  const importData=(e)=>{const file=e.target.files[0];if(!file)return;const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(d.projects&&d.doors){setProjects(d.projects);setDoors(d.doors);lsSet("dr_projects",d.projects);lsSet("dr_doors",d.doors);alert("Imported successfully!");}else alert("Invalid backup file.");}catch{alert("Could not read file.");}};r.readAsText(file);};
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+      <div style={{...CS,width:480,maxWidth:"100%",boxShadow:"0 8px 32px rgba(0,0,0,0.15)"}}>
+        <div style={{fontSize:16,fontWeight:500,marginBottom:20}}>Settings</div>
+        <div style={{marginBottom:20}}>
+          <label style={LS}>Anthropic API Key <span style={{textTransform:"none",letterSpacing:0,fontWeight:400,color:C.hint}}>(for PDF parsing)</span></label>
+          <input style={IS} type="password" value={key} onChange={e=>setKey(e.target.value)} placeholder="sk-ant-..." />
+          <div style={{fontSize:11,color:C.hint,marginTop:5}}>Stored only in this browser. Used only to call Anthropic directly for schedule parsing.</div>
+        </div>
+        <div style={{borderTop:"1px solid rgba(0,0,0,0.1)",paddingTop:16,marginBottom:16}}>
+          <div style={{fontSize:13,fontWeight:500,marginBottom:10}}>Data Management</div>
+          <div style={{display:"flex",gap:8,marginBottom:8}}><button style={BS} onClick={exportData}>Export Backup (.json)</button><button style={BS} onClick={()=>importRef.current.click()}>Import Backup</button><input ref={importRef} type="file" accept=".json" style={{display:"none"}} onChange={importData} /></div>
+          <div style={{fontSize:11,color:C.hint}}>Export regularly. Data lives in your browser — clearing cache will erase it without a backup.</div>
+        </div>
+        <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}><button style={BS} onClick={onClose}>Cancel</button><button style={BP} onClick={()=>{setApiKey(key);onClose();}}>Save</button></div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
