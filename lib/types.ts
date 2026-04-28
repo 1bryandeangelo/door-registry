@@ -1,11 +1,12 @@
 export type Role = "admin" | "member";
+export type Plan = "registry" | "pro";
 export type QcStatus = "Pending" | "Approved" | "Failed";
 export type NoteCategory = "General" | "Install" | "QC" | "Field Issue" | "Damage" | "RFI" | "Other";
 
-export interface Company { id: string; name: string; created_at: string; }
+export interface Company { id: string; name: string; plan: Plan; created_at: string; }
 export interface Profile { id: string; company_id: string | null; full_name: string | null; role: Role; created_at: string; email?: string; }
 export interface Invitation { id: string; company_id: string; email: string; token: string; invited_by: string | null; accepted_at: string | null; created_at: string; invited_by_name?: string; }
-export interface Project { id: string; company_id: string; job_number: string | null; name: string; address: string | null; schedule_approved: boolean; hw_cutsheet_path: string | null; hw_cutsheet_media_type: string | null; created_by: string | null; created_at: string; updated_at: string; }
+export interface Project { id: string; company_id: string; job_number: string | null; name: string; address: string | null; schedule_approved: boolean; pinned: boolean; hw_cutsheet_path: string | null; hw_cutsheet_media_type: string | null; created_by: string | null; created_at: string; updated_at: string; }
 export interface Door { uid: string; door_id: string; project_id: string; company_id: string; location: string | null; manufacturer: string | null; model: string | null; thermal: string | null; elevation: string | null; glass_tag: string | null; glass_makeup: string | null; glass_size: string | null; has_midrail: boolean; glass_size_midrail: string | null; finish: string | null; hw_set: string | null; hw_schedule: string | null; door_function: string | null; swing: string | null; transom: boolean; sidelite: boolean; fire_rated: boolean; work_order: string | null; qc_sheet: string | null; qc_status: QcStatus; qc_date: string | null; elevation_image_path: string | null; floorplan_image_path: string | null; hw_items: HwItem[]; created_by: string | null; created_at: string; updated_at: string; }
 export interface HwItem { qty: string; description: string; partNumber: string; finish: string; itemCode: string; mfr: string; cutsheetPages: number[]; cutsheetNote: string; }
 export interface DoorFile { id: string; door_uid: string; company_id: string; name: string; mime_type: string | null; storage_path: string; created_at: string; }
