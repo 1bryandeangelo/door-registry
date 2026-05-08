@@ -70,6 +70,7 @@ export default function ProjectWizard({ companyId, userId, onClose, onSaved }: P
   const [curDoor, setCurDoor] = useState<DoorFormData>({ ...EMPTY_DOOR_FORM });
 
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
   const setP = (k: keyof typeof proj, v: string | boolean) => setProj((p) => ({ ...p, [k]: v }));
 
@@ -144,6 +145,7 @@ export default function ProjectWizard({ companyId, userId, onClose, onSaved }: P
 
   const saveToDB = async (doors: DoorFormData[]) => {
     setSaving(true);
+    setSaveError("");
 
     const { data: project, error: projErr } = await supabase
       .from("projects")
@@ -158,10 +160,14 @@ export default function ProjectWizard({ companyId, userId, onClose, onSaved }: P
       .select()
       .single();
 
-    if (projErr || !project) { setSaving(false); return; }
+    if (projErr || !project) {
+      setSaveError(projErr?.message ?? "Failed to create project. Please try again.");
+      setSaving(false);
+      return;
+    }
 
     if (doors.length > 0) {
-      await supabase.from("doors").insert(
+      const { error: doorsErr } = await supabase.from("doors").insert(
         doors.map((d) => ({
           door_id: d.door_id,
           project_id: project.id,
@@ -186,11 +192,17 @@ export default function ProjectWizard({ companyId, userId, onClose, onSaved }: P
           fire_rated: d.fire_rated,
           work_order: d.work_order || null,
           qc_sheet: d.qc_sheet || null,
-          qc_status: d.qc_status,
+          qc_status: d.qc_status || "Pending",
           qc_date: d.qc_date || null,
           created_by: userId,
         }))
       );
+      if (doorsErr) {
+        setSaveError(`Project created but doors failed to save: ${doorsErr.message}`);
+        setSaving(false);
+        onSaved(project.id);
+        return;
+      }
     }
 
     setSaving(false);
@@ -221,6 +233,12 @@ export default function ProjectWizard({ companyId, userId, onClose, onSaved }: P
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
       <div style={{ background: "#fff", border: "1px solid var(--border)", borderRadius: 10, padding: "22px 24px", width: 620, maxWidth: "100%", maxHeight: "92vh", overflowY: "auto", boxShadow: "0 8px 40px rgba(0,0,0,0.18)" }}>
+
+        {saveError && (
+          <div style={{ fontSize: 12, color: "var(--danger)", marginBottom: 14, padding: "8px 12px", background: "var(--danger-bg)", borderRadius: 5, border: "1px solid var(--danger)" }}>
+            {saveError}
+          </div>
+        )}
 
         <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 22, flexWrap: "wrap" }}>
           {STEPS.map((s, i) => (
