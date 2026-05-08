@@ -19,6 +19,7 @@ const EXTRACT_TOOL: Anthropic.Tool = {
           properties: {
             door_id:       { type: "string", description: "Door number/ID e.g. '101', '202A'" },
             hw_set:        { type: "string", description: "Hardware set label e.g. 'SF-1'" },
+            door_material: { type: "string", description: "Door material e.g. 'HM', 'Wood', 'Aluminum', 'Glass'" },
             door_function: { type: "string", description: "Function or description if listed" },
             swing:         { type: "string", description: "Swing direction e.g. 'Active RH', 'Pair - Active LH'" },
             fire_rated:    { type: "boolean", description: "True if fire-rated is noted" },
@@ -33,6 +34,14 @@ const EXTRACT_TOOL: Anthropic.Tool = {
     required: ["doors"],
   },
 };
+
+const PROGRESS_STEPS = [
+  "Scanning document…",
+  "Identifying door entries…",
+  "Reading hardware sets and materials…",
+  "Extracting swing directions and fire ratings…",
+  "Almost done — compiling results…",
+];
 
 export async function POST(req: NextRequest) {
   const formData = await req.formData();
@@ -52,9 +61,16 @@ export async function POST(req: NextRequest) {
       const send = (data: object) =>
         controller.enqueue(encoder.encode("data: " + JSON.stringify(data) + "\n\n"));
 
-      try {
-        send({ type: "progress", message: "Reading schedule…" });
+      let stepIdx = 0;
+      send({ type: "progress", message: PROGRESS_STEPS[stepIdx++] });
 
+      const progressTimer = setInterval(() => {
+        if (stepIdx < PROGRESS_STEPS.length) {
+          send({ type: "progress", message: PROGRESS_STEPS[stepIdx++] });
+        }
+      }, 5000);
+
+      try {
         const fileBlock = isImage
           ? ({ type: "image", source: { type: "base64", media_type: mediaType as "image/jpeg" | "image/png" | "image/gif" | "image/webp", data: b64 } } as const)
           : ({ type: "document", source: { type: "base64", media_type: "application/pdf" as const, data: b64 } } as const);
@@ -69,10 +85,12 @@ export async function POST(req: NextRequest) {
             role: "user",
             content: [
               fileBlock,
-              { type: "text", text: "Extract all doors from this hardware schedule." },
+              { type: "text", text: "Extract all doors from this hardware schedule, including door material (e.g. HM, Wood, Aluminum)." },
             ],
           }],
         });
+
+        clearInterval(progressTimer);
 
         const toolUse = response.content.find((b) => b.type === "tool_use");
         if (!toolUse || toolUse.type !== "tool_use") {
@@ -82,6 +100,7 @@ export async function POST(req: NextRequest) {
         const parsed = toolUse.input as { doors?: ParsedDoorStub[] };
         send({ type: "done", doors: parsed.doors ?? [] });
       } catch (err) {
+        clearInterval(progressTimer);
         send({ type: "error", message: err instanceof Error ? err.message : "Parse failed." });
       } finally {
         controller.close();

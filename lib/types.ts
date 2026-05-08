@@ -19,7 +19,7 @@ export const DOOR_FUNCTIONS = ["Passage","Storeroom","Entrance / Vestibule","Off
 export const SWING_OPTIONS = ["LH Inswing","LH Outswing","RH Inswing","RH Outswing","LHR Inswing","LHR Outswing","RHR Inswing","RHR Outswing","Pair - Active LH","Pair - Active RH","Sliding","Bi-fold","Other"];
 export const QC_OPTIONS: QcStatus[] = ["Pending","Approved","Failed"];
 export const NOTE_CATEGORIES: NoteCategory[] = ["General","Install","QC","Field Issue","Damage","RFI","Other"];
-export interface ParsedDoorStub { door_id: string; hw_set: string; door_function: string; swing: string; transom: boolean; sidelite: boolean; fire_rated: boolean; location: string; elevation: string; hw_schedule: string; work_order: string; qc_sheet: string; qc_status: QcStatus; qc_date: string; }
+export interface ParsedDoorStub { door_id: string; hw_set: string; door_function: string; swing: string; door_material: string; transom: boolean; sidelite: boolean; fire_rated: boolean; location: string; elevation: string; hw_schedule: string; work_order: string; qc_sheet: string; qc_status: QcStatus; qc_date: string; }
 export interface ScheduleParseResult { doorSets: Record<string, string>; sets: Record<string, RawHwItem[]>; }
 export interface RawHwItem { qty: string; description: string; partNumber: string; finish: string; itemCode: string; mfr: string; }
 export interface CutsheetMatch { pages: number[]; note: string; }

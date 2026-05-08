@@ -325,19 +325,25 @@ export default function ProjectWizard({ companyId, userId, onClose, onSaved }: P
             </h3>
             <p style={{ fontSize: 13, color: "var(--muted)", margin: "0 0 16px" }}>
               {parsedDoors.length > 0
-                ? "Review below, then walk through each door to confirm details."
+                ? "Remove any doors you don't own, then walk through the rest to confirm details."
                 : "No doors extracted. Add them manually after creating the project."}
             </p>
             {parsedDoors.length > 0 && (
-              <div style={{ maxHeight: 240, overflowY: "auto", border: "1px solid var(--border)", borderRadius: 6, marginBottom: 16 }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", padding: "5px 12px", borderBottom: "1px solid var(--border)", background: "var(--surface)" }}>
-                  {["Door", "Set", "Swing"].map((h) => <span key={h} style={{ fontSize: 10, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--muted)" }}>{h}</span>)}
+              <div style={{ maxHeight: 260, overflowY: "auto", border: "1px solid var(--border)", borderRadius: 6, marginBottom: 16 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 28px", padding: "5px 12px", borderBottom: "1px solid var(--border)", background: "var(--surface)" }}>
+                  {["Door", "Set", "Material"].map((h) => <span key={h} style={{ fontSize: 10, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--muted)" }}>{h}</span>)}
+                  <span />
                 </div>
                 {parsedDoors.map((d, i) => (
-                  <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", padding: "6px 12px", borderBottom: "1px solid rgba(0,0,0,0.07)", fontSize: 12 }}>
+                  <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 28px", padding: "6px 12px", borderBottom: "1px solid rgba(0,0,0,0.07)", fontSize: 12, alignItems: "center" }}>
                     <span style={{ fontWeight: 500 }}>{d.door_id}</span>
                     <span style={{ color: "var(--muted)" }}>{d.hw_set}</span>
-                    <span style={{ color: d.swing ? "var(--text)" : "var(--hint)" }}>{d.swing || "—"}</span>
+                    <span style={{ color: d.door_material ? "var(--text)" : "var(--hint)" }}>{d.door_material || "—"}</span>
+                    <button
+                      onClick={() => setParsedDoors((prev) => prev.filter((_, idx) => idx !== i))}
+                      title="Remove this door"
+                      style={{ background: "none", border: "none", cursor: "pointer", color: "var(--hint)", fontSize: 14, padding: 0, lineHeight: 1, textAlign: "center" }}
+                    >×</button>
                   </div>
                 ))}
               </div>
