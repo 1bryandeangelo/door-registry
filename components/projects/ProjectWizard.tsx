@@ -216,7 +216,7 @@ export default function ProjectWizard({ companyId, userId, onClose, onSaved }: P
     }
   };
 
-  const STEPS = ["Project Info", "Upload Page", "Review Doors", "Per-Door Details"];
+  const STEPS = ["Project Info", "Upload Schedule", "Review Doors", "Per-Door Details"];
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
@@ -284,7 +284,7 @@ export default function ProjectWizard({ companyId, userId, onClose, onSaved }: P
 
         {step === 2 && (
           <>
-            <h3 style={{ fontSize: 16, fontWeight: 500, margin: "0 0 6px" }}>Upload page containing door schedule</h3>
+            <h3 style={{ fontSize: 16, fontWeight: 500, margin: "0 0 6px" }}>Upload the door schedule.</h3>
             <p style={{ fontSize: 13, color: "var(--muted)", margin: "0 0 16px" }}>AI reads the schedule and creates all doors with swing directions. Skip to add doors manually.</p>
             <div
               style={{ border: `1px dashed ${dragOver ? "var(--accent)" : "var(--border-med)"}`, background: dragOver ? "var(--accent-light)" : "transparent", borderRadius: 8, padding: 28, textAlign: "center", cursor: "pointer", marginBottom: 14, transition: "all 0.15s" }}
