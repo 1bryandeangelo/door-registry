@@ -242,7 +242,7 @@ export default function ProjectWizard({ companyId, userId, onClose, onSaved }: P
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, gridColumn: "1/-1" }}>
                 <input type="checkbox" id="sa" checked={proj.scheduleApproved} onChange={(e) => setP("scheduleApproved", e.target.checked)} />
-                <label htmlFor="sa" style={{ fontSize: 13 }}>Door schedule is architect-approved</label>
+                <label htmlFor="sa" style={{ fontSize: 13 }}>Hardware schedule is architect-approved</label>
               </div>
             </div>
 
