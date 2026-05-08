@@ -99,7 +99,7 @@ export default function ProjectWizard({ companyId, userId, onClose, onSaved }: P
     if (!pdfFile) return;
     setParsing(true);
     setParseError("");
-    setParseMsg("Parsing hardware schedule…");
+    setParseMsg("Parsing door schedule…");
 
     const formData = new FormData();
     formData.append("file", pdfFile);
@@ -206,7 +206,7 @@ export default function ProjectWizard({ companyId, userId, onClose, onSaved }: P
     }
   };
 
-  const STEPS = ["Project Info", "Upload Schedule", "Review Doors", "Per-Door Details"];
+  const STEPS = ["Project Info", "Upload Page", "Review Doors", "Per-Door Details"];
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
@@ -242,7 +242,7 @@ export default function ProjectWizard({ companyId, userId, onClose, onSaved }: P
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, gridColumn: "1/-1" }}>
                 <input type="checkbox" id="sa" checked={proj.scheduleApproved} onChange={(e) => setP("scheduleApproved", e.target.checked)} />
-                <label htmlFor="sa" style={{ fontSize: 13 }}>Hardware schedule is architect-approved</label>
+                <label htmlFor="sa" style={{ fontSize: 13 }}>Door schedule is architect-approved</label>
               </div>
             </div>
 
@@ -274,7 +274,7 @@ export default function ProjectWizard({ companyId, userId, onClose, onSaved }: P
 
         {step === 2 && (
           <>
-            <h3 style={{ fontSize: 16, fontWeight: 500, margin: "0 0 6px" }}>Upload Hardware Schedule</h3>
+            <h3 style={{ fontSize: 16, fontWeight: 500, margin: "0 0 6px" }}>Upload page containing door schedule</h3>
             <p style={{ fontSize: 13, color: "var(--muted)", margin: "0 0 16px" }}>AI reads the schedule and creates all doors with swing directions. Skip to add doors manually.</p>
             <div
               style={{ border: `1px dashed ${dragOver ? "var(--accent)" : "var(--border-med)"}`, background: dragOver ? "var(--accent-light)" : "transparent", borderRadius: 8, padding: 28, textAlign: "center", cursor: "pointer", marginBottom: 14, transition: "all 0.15s" }}
@@ -285,7 +285,7 @@ export default function ProjectWizard({ companyId, userId, onClose, onSaved }: P
             >
               {pdfFile
                 ? <><div style={{ fontSize: 14, fontWeight: 500 }}>{pdfFile.name}</div><div style={{ fontSize: 12, color: "var(--muted)", marginTop: 3 }}>Click or drop to change</div></>
-                : <><div style={{ fontSize: 13, color: "var(--muted)" }}>Click or drag &amp; drop hardware schedule here</div><div style={{ fontSize: 12, color: "var(--hint)", marginTop: 3 }}>PDF · JPG · PNG</div></>
+                : <><div style={{ fontSize: 13, color: "var(--muted)" }}>Click or drag &amp; drop page containing door schedule here</div><div style={{ fontSize: 12, color: "var(--hint)", marginTop: 3 }}>PDF · JPG · PNG</div></>
               }
               <input ref={fileRef} type="file" accept=".pdf,image/*" style={{ display: "none" }} onChange={(e) => e.target.files?.[0] && setPdfFile(e.target.files[0])} />
             </div>
