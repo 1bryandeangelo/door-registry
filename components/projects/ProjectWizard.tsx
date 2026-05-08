@@ -45,7 +45,16 @@ export default function ProjectWizard({ companyId, userId, onClose, onSaved }: P
   const [parsing, setParsing] = useState(false);
   const [parseMsg, setParseMsg] = useState("");
   const [parseError, setParseError] = useState("");
+  const [parseAttempts, setParseAttempts] = useState(0);
   const [parsedDoors, setParsedDoors] = useState<ParsedDoorStub[]>([]);
+
+  const PARSE_SUGGESTIONS = [
+    "Try submitting again — it sometimes works on a second attempt.",
+    "Try uploading a tight crop of just the door schedule table, cutting out any surrounding content.",
+    "Make sure the image is sharp and level — low resolution or rotated scans are difficult to parse.",
+    "If the schedule spans multiple pages, try uploading one page at a time.",
+    "If nothing is working, use \"Skip — add manually\" below to enter the doors by hand.",
+  ];
 
   const [defaults, setDefaults] = useState<Record<DefKey, string>>({
     manufacturer: "", model: "", thermal: "Thermal",
@@ -128,6 +137,7 @@ export default function ProjectWizard({ companyId, userId, onClose, onSaved }: P
       }
     } catch (e) {
       setParseError(e instanceof Error ? e.message : "Parse failed.");
+      setParseAttempts((n) => n + 1);
     }
     setParsing(false);
   };
@@ -287,9 +297,16 @@ export default function ProjectWizard({ companyId, userId, onClose, onSaved }: P
                 ? <><div style={{ fontSize: 14, fontWeight: 500 }}>{pdfFile.name}</div><div style={{ fontSize: 12, color: "var(--muted)", marginTop: 3 }}>Click or drop to change</div></>
                 : <><div style={{ fontSize: 13, color: "var(--muted)" }}>Click or drag &amp; drop page containing door schedule here</div><div style={{ fontSize: 12, color: "var(--hint)", marginTop: 3 }}>PDF · JPG · PNG</div></>
               }
-              <input ref={fileRef} type="file" accept=".pdf,image/*" style={{ display: "none" }} onChange={(e) => e.target.files?.[0] && setPdfFile(e.target.files[0])} />
+              <input ref={fileRef} type="file" accept=".pdf,image/*" style={{ display: "none" }} onChange={(e) => { if (e.target.files?.[0]) { setPdfFile(e.target.files[0]); setParseError(""); setParseAttempts(0); } }} />
             </div>
-            {parseError && <div style={{ fontSize: 12, color: "var(--danger)", marginBottom: 12, padding: "8px 12px", background: "var(--danger-bg)", borderRadius: 5 }}>{parseError}</div>}
+            {parseError && (
+              <div style={{ fontSize: 12, marginBottom: 12, padding: "10px 12px", background: "var(--danger-bg)", borderRadius: 5, border: "1px solid var(--danger)" }}>
+                <div style={{ color: "var(--danger)", fontWeight: 500, marginBottom: 4 }}>{parseError}</div>
+                <div style={{ color: "var(--text)", marginTop: 4 }}>
+                  💡 {PARSE_SUGGESTIONS[Math.min(parseAttempts - 1, PARSE_SUGGESTIONS.length - 1)]}
+                </div>
+              </div>
+            )}
             {parseMsg && parsing && <div style={{ fontSize: 12, color: "var(--info)", marginBottom: 12, padding: "8px 12px", background: "var(--info-bg)", borderRadius: 5 }}>⏳ {parseMsg}</div>}
             <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
               <button style={BS} onClick={() => setStep(1)}>Back</button>
